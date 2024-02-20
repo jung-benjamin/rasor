@@ -64,7 +64,7 @@ class Evolution:
         unmasked_idx = np.where(~masked_fit.mask)[0]
         unmasked_val = masked_fit.data[unmasked_idx]
         smallest_idx = unmasked_idx[np.argpartition(unmasked_val, n)[:n]]
-        sorted_idx = smallest_idx[np.argsort(unmasked_val[smallest_idx])]
+        sorted_idx = smallest_idx[np.argsort(masked_fit[smallest_idx])]
         return sorted_idx
 
     def best_fitness_vals(self, n=5, cutoff=1e-4):
