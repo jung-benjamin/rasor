@@ -28,7 +28,7 @@ class Marginals(ABC):
         self.dims = limits.shape[1]
         self.bin_number = bin_number
         self._make_space()
-        self.set_sampler(**kwargs)
+        self._set_sampler(**kwargs)
 
     @abstractmethod
     def _set_sampler(self, **kwargs):
@@ -90,10 +90,10 @@ class GridMarginals(Marginals):
 
     def _set_sampler(self, **kwargs):
         """Set grid sampler instance."""
-        self.sampler = SamplerFactory.get_sampler(method='grid',
-                                                  limits=self.limits,
-                                                  bin_number=self.bin_number,
-                                                  **kwargs)
+        self.sampler = SamplerFactory().get_sampler(method='grid',
+                                                    limits=self.limits,
+                                                    bin_number=self.bin_number,
+                                                    **kwargs)
 
     def _set_samples(self, samples):
         self.samples = samples
@@ -118,10 +118,10 @@ class LegacyMarginals(GridMarginals):
 
     def _set_sampler(self, **kwargs):
         """Set legacy grid sampler instance."""
-        self.sampler = SamplerFactory.get_sampler(method='legacy',
-                                                  limits=self.limits,
-                                                  bin_number=self.bin_number,
-                                                  **kwargs)
+        self.sampler = SamplerFactory().get_sampler(method='legacy',
+                                                    limits=self.limits,
+                                                    bin_number=self.bin_number,
+                                                    **kwargs)
 
     def _make_space(self):
         """Set bin edges and centers of the parameter space."""
