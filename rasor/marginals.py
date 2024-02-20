@@ -22,12 +22,18 @@ def calc_bin_centers(edges):
 class Marginals(ABC):
     """Base class for approximating marginal distributions."""
 
-    def __init__(self, limits, bin_number=100):
+    def __init__(self, limits, bin_number=100, **kwargs):
         """Specify the parameter space."""
         self.limits = limits
         self.dims = limits.shape[1]
         self.bin_number = bin_number
         self._make_space()
+        self.set_sampler(**kwargs)
+
+    @abstractmethod
+    def _set_sampler(self, **kwargs):
+        """Set instance of sampler."""
+        ...
 
     def _make_space(self):
         """Create points on the parameter space axes."""
@@ -82,14 +88,12 @@ class Marginals(ABC):
 class GridMarginals(Marginals):
     """Approximate marginals with grid sampling."""
 
-    def __init__(self, limits, bin_number=100):
-        """Specify the parameter space."""
-        self.limits = limits
-        self.dims = limits.shape[1]
-        self.bin_number = bin_number
+    def _set_sampler(self, **kwargs):
+        """Set grid sampler instance."""
         self.sampler = SamplerFactory.get_sampler(method='grid',
-                                                  limits=limits,
-                                                  bin_number=bin_number)
+                                                  limits=self.limits,
+                                                  bin_number=self.bin_number,
+                                                  **kwargs)
 
     def _set_samples(self, samples):
         self.samples = samples
@@ -112,27 +116,33 @@ class LegacyMarginals(GridMarginals):
     Sobol sampler.
     """
 
-    def __init__(self, limits, bin_number=100):
-        """Specify the parameter space."""
-        self.limits = limits
-        self.dims = limits.shape[1]
-        self.bin_number = bin_number
+    def _set_sampler(self, **kwargs):
+        """Set legacy grid sampler instance."""
         self.sampler = SamplerFactory.get_sampler(method='legacy',
-                                                  limits=limits,
-                                                  bin_number=bin_number)
+                                                  limits=self.limits,
+                                                  bin_number=self.bin_number,
+                                                  **kwargs)
+
+    def _make_space(self):
+        """Set bin edges and centers of the parameter space."""
+        bins = make_bin_edges(limits=self.limits,
+                              bin_number=self.bin_number - 1)
+        widths = np.diff(bins, axis=0)[0]
+        bin_edges = np.ones((bins.shape[0] + 1, bins.shape[1]))
+        bin_edges[:-1, :] = bins - widths / 2
+        bin_edges[-1, :] = bins[-1, :] + widths / 2
+        self.bins = bin_edges
+        self.space = bins
 
 
 class SobolMarginals(Marginals):
     """Approximate marginals with the Sobol sequence."""
 
-    def __init__(self, limits, bin_number=100, m=10):
-        """Specify the parameter space and number of samples."""
-        self.limits = limits
-        self.dims = limits.shape[1]
-        self.bin_number = bin_number
-        self._make_space()
-        self.m = m
-        self.sampler = SamplerFactory.get_sampler(method='sobol', m=m)
+    def _set_sampler(self, **kwargs):
+        """Set the Sobol sampler instance."""
+        self.sampler = SamplerFactory().get_sampler(method='sobol',
+                                                    limits=self.limits,
+                                                    **kwargs)
 
     def _calc_bin_indices(self):
         """Calculate the sample indices associated with each bin."""
