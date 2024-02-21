@@ -37,7 +37,7 @@ class MarginalLikelihoodUncertainty:
         """Approximate uncertainty of likelihood marginals"""
         self.likelihood.test_point = test_point
         self.marginals.calculate_marginals(self.likelihood)
-        mu, sd = self.marginals.parametrize_marginals()
+        mu, sd = self.marginals.parameterize_marginals()
         return 100 * sd / mu
 
     @classmethod
@@ -49,11 +49,12 @@ class MarginalLikelihoodUncertainty:
         marginals = m_fac.get_marginals(**m_dict)
         l_dict = d['Likelihood'].copy()
         x = np.load(d['Likelihood']['surrogates']['x_file'], allow_pickle=True)
-        y = np.load(d['Likelihood']['surrogates']['y_file'], allow_pickle=True)
-        surrogate = {
-            r: Surrogate.ratio_from_isotopes(x=x, y=y, r=r)
+        y = np.load(d['Likelihood']['surrogates']['y_file'],
+                    allow_pickle=True).item()
+        surrogate = [
+            Surrogate.ratio_from_isotopes(x=x, y=y, r=r)
             for r in d['Problem']['ratios']
-        }
+        ]
         likelihood = GaussianLikelihood(surrogates=surrogate,
                                         **l_dict['uncertainty'])
         return cls(likelihood=likelihood, marginals=marginals)
@@ -63,7 +64,8 @@ class MaxLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
     """Maximum of marginal likelihood uncertainty"""
 
     def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(likelihood=likelihood,
+        MarginalLikelihoodUncertainty.__init__(self,
+                                               likelihood=likelihood,
                                                marginals=marginals)
 
     def _metric_function(self, test_point):
@@ -75,7 +77,8 @@ class SqSumLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
     """Squared sum of marginal likelihood uncertainties"""
 
     def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(likelihood=likelihood,
+        MarginalLikelihoodUncertainty.__init__(self,
+                                               likelihood=likelihood,
                                                marginals=marginals)
 
     def _metric_function(self, test_point):

@@ -53,7 +53,6 @@ class LikelihoodModel(ABC):
                  **kwargs):
         """Set the test point and the surrogate models."""
         self.surrogates = surrogates
-        self.test_point = test_point
         self.uncertainty = UncertaintyFactory().get_model(
             uncertainty_model, **kwargs)
         if test_point is not None:

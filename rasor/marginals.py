@@ -29,6 +29,15 @@ class Marginals(ABC):
         self.bin_number = bin_number
         self._make_space()
         self._set_sampler(**kwargs)
+        self._samples = None
+
+    @property
+    def samples(self):
+        return self._samples
+
+    @samples.setter
+    def samples(self, s):
+        self._samples = s
 
     @abstractmethod
     def _set_sampler(self, **kwargs):
@@ -68,6 +77,8 @@ class Marginals(ABC):
 
     def calculate_marginals(self, pdf):
         """Approximate marginal distributions of pdf in each dimension."""
+        if self.samples is None:
+            self.create_samples()
         marginals = self._marginalize(pdf)
         marginals = marginals.T / (marginals *
                                    np.diff(self.bins, axis=0).T).sum(axis=1)
