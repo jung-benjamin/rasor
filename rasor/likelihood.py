@@ -46,18 +46,36 @@ class UncertaintyFactory:
 class LikelihoodModel(ABC):
     """Approximate the joint probabilitiy density function."""
 
-    def __init__(self, surrogates, test_point, uncertainty_model, **kwargs):
+    def __init__(self,
+                 surrogates,
+                 uncertainty_model,
+                 test_point=None,
+                 **kwargs):
         """Set the test point and the surrogate models."""
         self.surrogates = surrogates
         self.test_point = test_point
         self.uncertainty = UncertaintyFactory().get_model(
             uncertainty_model, **kwargs)
+        if test_point is not None:
+            self.test_point = test_point
+        else:
+            self._test_point = test_point
+
+    @property
+    def test_point(self):
+        """Test point on which likelihood is conditional."""
+        return self._test_point
+
+    @test_point.setter
+    def test_point(self, tp):
+        """Set a test point and calculate mu and sigma."""
+        self._test_point = tp
         self.calc_mu()
         self.calc_sigma()
 
     def calc_mu(self):
         """Evaluate the surrogates on the test point."""
-        self.mu = [sur(self.test_point) for sur in self.surrogates]
+        self.mu = [sur(self._test_point) for sur in self.surrogates]
 
     def calc_sigma(self):
         self.sigma = [self.uncertainty(m) for m in self.mu]
