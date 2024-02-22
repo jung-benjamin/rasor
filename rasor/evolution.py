@@ -3,7 +3,35 @@
 
 import numpy as np
 
+from .likelihood import GaussianLikelihood
+from .marginals import MarginalsFactory
+from .metrics import MaxLikelihoodUncertainty
 from .mutations import MutationFactory
+from .surrogates import Surrogate
+
+
+class Fitness:
+    """Fitness function for genetic algorithms."""
+
+    def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
+                 marginal_kwargs):
+        self.models = {
+            r: Surrogate.ratio_from_isotopes(*data, r=r)
+            for r in gene_pool
+        }
+        self.test_point = test_point
+        self.uncertainty_kwargs = uncertainty_kwargs
+        self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
+
+    def __call__(self, gene):
+        """Evaluate the fitness function."""
+        likelihood = GaussianLikelihood(
+            surrogates=[self.models[g] for g in gene],
+            test_point=self.test_point,
+            **self.uncertainty_kwargs)
+        metric = MaxLikelihoodUncertainty(likelihood=likelihood,
+                                          marginals=self.marginals)
+        return metric(self.test_point)
 
 
 class Evolution:
