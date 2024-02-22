@@ -90,3 +90,17 @@ class Minotaur:
         else:
             keys, solubility = self._scan()
         return keys, solubility
+
+
+class Aftermath:
+    """Analyze the aftermath of a minotaur fight."""
+
+    def __init__(self, keys, solubility):
+        """Set solubility matrix and keys for each axis."""
+        self.keys = np.array(keys)
+        self.matrix = np.array(solubility)
+
+    def find_best_ratios(self):
+        """Find best ratio set for each grid point."""
+        min_idx = self.matrix.argmin(axis=0)
+        return self.keys[sorted(set(min_idx))]
