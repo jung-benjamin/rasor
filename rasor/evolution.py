@@ -2,6 +2,7 @@
 """Simulate evolution with a genetic algorithm."""
 
 import logging
+from multiprocessing import Pool
 
 import numpy as np
 
@@ -189,6 +190,13 @@ class Evolution:
         return best, fitness_evo
 
 
+def natural_selection(fitness_kws, evolution_kws, max_iter):
+    """Apply genetic selection"""
+    fitness_func = Fitness(**fitness_kws)
+    island = Evolution(**evolution_kws, fitness_func=fitness_func)
+    return island.darwinism(max_iter=max_iter)
+
+
 class GalapagosIslands:
     """Run genetic evolution with different starting conditions."""
 
@@ -258,25 +266,55 @@ class GalapagosIslands:
         """Iterate over the test points and run evolution"""
         best_genes, fitness_evolution = [], []
         for tp in self.test_points:
-            fitness_func = Fitness(gene_pool=self.gene_pool,
-                                   data=self.data,
-                                   marginal_kwargs=self.marginal_kwargs,
-                                   uncertainty_kwargs=self.uncertainty_kwargs,
-                                   test_point=tp)
-            island = Evolution(gene_pool=self.gene_pool,
-                               fitness_func=fitness_func,
-                               mutations=self.mutations,
-                               init_size=self.init_size,
-                               init_length=self.init_length,
-                               rng_seed=self.rng_seed)
-            print(len(island.population))
-            best, fitness = island.darwinism(self.max_iter)
+            fit_kws = {
+                'gene_pool': self.gene_pool,
+                'data': self.data,
+                'marginal_kwargs': self.marginal_kwargs,
+                'uncertainty_kwargs': self.uncertainty_kwargs,
+                'test_point': tp
+            }
+            evo_kws = {
+                'gene_pool': self.gene_pool,
+                'mutations': self.mutations,
+                'init_size': self.init_size,
+                'init_length': self.init_length,
+                'rng_seed': self.rng_seed
+            }
+            best, fitness = natural_selection(fitness_kws=fit_kws,
+                                              evolution_kws=evo_kws,
+                                              max_iter=self.max_iter)
             best_genes.append(best)
             fitness_evolution.append(fitness)
         return best_genes, fitness_evolution
 
     def _scan_multiproc(self, num_proc):
-        raise NotImplementedError
+        args = []
+        for tp in self.test_points:
+            args.append((
+                {
+                    'gene_pool': self.gene_pool,
+                    'data': self.data,
+                    'marginal_kwargs': self.marginal_kwargs,
+                    'uncertainty_kwargs': self.uncertainty_kwargs,
+                    'test_point': tp
+                },
+                {
+                    'gene_pool': self.gene_pool,
+                    'mutations': self.mutations,
+                    'init_size': self.init_size,
+                    'init_length': self.init_length,
+                    'rng_seed': self.rng_seed
+                },
+                self.max_iter,
+            ))
+        self.logger.debug(f'Length of multiprocessing args: {len(args)}')
+        with Pool(processes=num_proc) as pool:
+            output = pool.starmap(natural_selection, list(args))
+        best_genes, fitness_evolution = [], []
+        for b, f in output:
+            best_genes.append(b)
+            fitness_evolution.append(f)
+        return best_genes, fitness_evolution
 
     def speciate(self, num_proc=1):
         """Run evolution for each test point."""

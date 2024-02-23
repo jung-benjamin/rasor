@@ -2,6 +2,7 @@
 """Select isotopic ratios by evaluating all combinations."""
 
 from itertools import combinations
+from multiprocessing import Pool
 
 import numpy as np
 
@@ -81,7 +82,14 @@ class Minotaur:
         return list(matrices.keys()), list(matrices.values())
 
     def _scan_multiproc(self, num_proc):
-        raise NotImplementedError
+        args = {
+            ','.join(c): (c, self.test_points, self.metric_params)
+            for c in self.combinations()
+        }
+        with Pool(processes=num_proc) as pool:
+            matrices = pool.starmap(evaluate_solubility_matrix,
+                                    list(args.values()))
+        return list(args), list(matrices)
 
     def fight(self, num_proc=1):
         """Calculate solubility matrix for each ratio combination."""
