@@ -146,3 +146,9 @@ class MutationFactory:
         if not mutation:
             raise ValueError(mutation)
         return mutation(**kwargs)
+
+    @classmethod
+    def config_logger(cls, **kwargs):
+        """Configure logger of all mutation classes."""
+        for m, c in cls._mutations.items():
+            c.config_logger(**kwargs)

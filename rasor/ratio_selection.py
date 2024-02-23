@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from rasor import config_global_logging
 from rasor.bruteforce import Aftermath, Minotaur
 from rasor.evolution import GalapagosIslands
 
@@ -49,8 +50,7 @@ def parse_input_file(infile):
         algorithm_kws = arg_dict['Algorithm']
         algorithm = list(algorithm_kws)[0]
     ratios = arg_dict['Problem']['ratios']
-    print(ratios)
-    print(f'Number of unique ratios: {len(set(ratios))}')
+    logging.info(f'Number of unique ratios: {len(set(ratios))}')
     limits = arg_dict['Problem']['limits']
     metric_kws = arg_dict['Metric']
     metric_kws.update({'limits': np.array(metric_kws.get('limits', limits))})
@@ -69,9 +69,6 @@ def parse_input_file(infile):
             marginal_kwargs=metric_kws,
             uncertainty_kwargs=arg_dict['Likelihood']['uncertainty'],
             **algorithm_kws[algorithm])
-        print(islands.init_length)
-        print(islands.init_size)
-        print(len(islands.gene_pool))
         return islands
     elif algorithm == 'brute_force':
         battering_ram = Minotaur(ratios=ratios,
@@ -110,10 +107,29 @@ def run_ratio_selection(args):
                   output_dir=args.output)
 
 
+def config_logging(loglevel='INFO',
+                   logpath=None,
+                   formatstr='%(levelname)s:%(name)s:%(message)s'):
+    """Configure root and module loggers."""
+    config_global_logging(loglevel=loglevel,
+                          logpath=logpath,
+                          formatstr=formatstr)
+    log = logging.getLogger()
+    log.setLevel(getattr(logging, loglevel.upper()))
+    log.handlers.clear()
+    fmt = logging.Formatter(formatstr)
+    sh = logging.StreamHandler()
+    sh.setLevel(getattr(logging, loglevel.upper()))
+    sh.setFormatter(fmt)
+    log.addHandler(sh)
+    if logpath:
+        fh = logging.FileHandler(logpath)
+        fh.setLevel(getattr(logging, loglevel.upper()))
+        fh.setFormatter(fmt)
+        log.addHandler(fh)
+
+
 if __name__ == '__main__':
     args = argparser()
-    logging.getLogger('CrossOver').setLevel(args.log_level)
-    logging.getLogger('CrossOver').addHandler(logging.StreamHandler())
-    logging.getLogger('Evolution').setLevel(args.log_level)
-    logging.getLogger('Evolution').addHandler(logging.StreamHandler())
+    config_logging(loglevel=args.log_level)
     run_ratio_selection(args)
