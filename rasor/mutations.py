@@ -66,7 +66,8 @@ class CrossOver(Mutation):
         self.logger.debug(f'Size of fittest pool: {len(fittest_pool)}')
         self.logger.debug(f'Length of genes: {self.gene_length}')
         crossed = [
-            self.rng.choice(fittest_pool, size=self.gene_length,
+            self.rng.choice(fittest_pool,
+                            size=min(self.gene_length, len(fittest_pool)),
                             replace=False).tolist() for i in range(n)
         ]
         return crossed
