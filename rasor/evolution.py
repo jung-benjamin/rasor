@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 """Simulate evolution with a genetic algorithm."""
 
+import logging
+
 import numpy as np
 
 from .likelihood import GaussianLikelihood
@@ -64,10 +66,36 @@ class Evolution:
             for m in mutations
         }
 
+    @property
+    def logger(self):
+        """Get logger."""
+        return logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def config_logger(cls,
+                      loglevel='INFO',
+                      logpath=None,
+                      formatstr='%(levelname)s:%(name)s:%(message)s'):
+        """Configure the logger."""
+        log = logging.getLogger(cls.__name__)
+        log.setLevel(getattr(logging, loglevel.upper()))
+        log.handlers.clear()
+        fmt = logging.Formatter(formatstr)
+        sh = logging.StreamHandler()
+        sh.setLevel(getattr(logging, loglevel.upper()))
+        sh.setFormatter(fmt)
+        log.addHandler(sh)
+        if logpath:
+            fh = logging.FileHandler(logpath)
+            fh.setLevel(getattr(logging, loglevel.upper()))
+            fh.setFormatter(fmt)
+            log.addHandler(fh)
+
     def _set_initial_population(self):
         """Create the inital population of genes."""
         self.population = self.draw_from_pool(number=self.init_size,
                                               length=self.init_length)
+        self.logger.debug(f'Initial population size: {len(self.population)}')
 
     def draw_from_pool(self, number, length):
         """Combine genes to form population members."""
@@ -108,6 +136,7 @@ class Evolution:
             self.population[i]
             for i in self.best_fitness_idx(n=n, cutoff=cutoff)
         ]
+        self.logger.debug(f'Lengths of elites: {[len(f) for f in fittest]}')
         return fittest
 
     mutation_fraction = {
@@ -215,6 +244,7 @@ class GalapagosIslands:
                                init_size=self.init_size,
                                init_length=self.init_length,
                                rng_seed=self.rng_seed)
+            print(len(island.population))
             best, fitness = island.darwinism(self.max_iter)
             best_genes.append(best)
             fitness_evolution.append(fitness)

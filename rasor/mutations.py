@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 """Mutate ratiolists for the genetic algorithm."""
 
+import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 
@@ -23,6 +24,31 @@ class Mutation(ABC):
         self.gene_pool = gene_pool
         self.rng = rng
 
+    @property
+    def logger(self):
+        """Get logger."""
+        return logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def config_logger(cls,
+                      loglevel='INFO',
+                      logpath=None,
+                      formatstr='%(levelname)s:%(name)s:%(message)s'):
+        """Configure the logger."""
+        log = logging.getLogger(cls.__name__)
+        log.setLevel(getattr(logging, loglevel.upper()))
+        log.handlers.clear()
+        fmt = logging.Formatter(formatstr)
+        sh = logging.StreamHandler()
+        sh.setLevel(getattr(logging, loglevel.upper()))
+        sh.setFormatter(fmt)
+        log.addHandler(sh)
+        if logpath:
+            fh = logging.FileHandler(logpath)
+            fh.setLevel(getattr(logging, loglevel.upper()))
+            fh.setFormatter(fmt)
+            log.addHandler(fh)
+
     @abstractmethod
     def _mutate(self, genes):
         ...
@@ -37,6 +63,8 @@ class CrossOver(Mutation):
     def _mutate(self, genes):
         n = int(self.population_size * self.frequency)
         fittest_pool = pool_genes(genes)
+        self.logger.debug(f'Size of fittest pool: {len(fittest_pool)}')
+        self.logger.debug(f'Length of genes: {self.gene_length}')
         crossed = [
             self.rng.choice(fittest_pool, size=self.gene_length,
                             replace=False).tolist() for i in range(n)
