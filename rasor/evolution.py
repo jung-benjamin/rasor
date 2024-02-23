@@ -7,6 +7,7 @@ from .likelihood import GaussianLikelihood
 from .marginals import MarginalsFactory
 from .metrics import MaxLikelihoodUncertainty
 from .mutations import MutationFactory
+from .sampling import SamplerFactory
 from .surrogates import Surrogate
 
 
@@ -157,3 +158,75 @@ class Evolution:
             self.evolve()
         best = self.elitism(n=1)
         return best, fitness_evo
+
+
+class GalapagosIslands:
+    """Run genetic evolution with different starting conditions."""
+
+    def __init__(self,
+                 gene_pool,
+                 mutations,
+                 test_points,
+                 data,
+                 uncertainty_kwargs,
+                 marginal_kwargs,
+                 init_size=100,
+                 init_length=10,
+                 max_iter=20,
+                 rng_seed=12345):
+        """Define the test space and set the metric."""
+        test_point_dispatcher = {
+            np.ndarray: self.set_test_points,
+            dict: self.sample_test_points
+        }
+        t = type(test_points)
+        test_point_dispatcher[t](test_points)
+        self.gene_pool = gene_pool
+        self.mutations = mutations
+        self.init_size = init_size
+        self.init_length = init_length
+        self.rng_seed = rng_seed
+        self.data = data
+        self.uncertainty_kwargs = uncertainty_kwargs
+        self.marginal_kwargs = marginal_kwargs
+        self.max_iter = max_iter
+
+    def set_test_points(self, tp):
+        """Set the test point array."""
+        self.test_points = tp
+
+    def sample_test_points(self, kwarg_dict):
+        """Create a sampler and create the test point array."""
+        self.sampler = SamplerFactory().get_sampler(**kwarg_dict)
+        self.set_test_points(self.sampler())
+
+    def _scan(self):
+        """Iterate over the test points and run evolution"""
+        best_genes, fitness_evolution = [], []
+        for tp in self.test_points:
+            fitness_func = Fitness(gene_pool=self.gene_pool,
+                                   data=self.data,
+                                   marginal_kwargs=self.marginal_kwargs,
+                                   uncertainty_kwargs=self.uncertainty_kwargs,
+                                   test_point=tp)
+            island = Evolution(gene_pool=self.gene_pool,
+                               fitness_func=fitness_func,
+                               mutations=self.mutations,
+                               init_size=self.init_size,
+                               init_length=self.init_length,
+                               rng_seed=self.rng_seed)
+            best, fitness = island.darwinism(self.max_iter)
+            best_genes.append(best)
+            fitness_evolution.append(fitness)
+        return best_genes, fitness_evolution
+
+    def _scan_multiproc(self, num_proc):
+        raise NotImplementedError
+
+    def speciate(self, num_proc=1):
+        """Run evolution for each test point."""
+        if num_proc > 1:
+            best_genes, fitness_evolution = self._scan_multiproc(num_proc)
+        else:
+            best_genes, fitness_evolution = self._scan()
+        return best_genes, fitness_evolution
