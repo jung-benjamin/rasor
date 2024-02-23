@@ -96,7 +96,7 @@ def store_results(selected, metric_vals, output_dir):
     if not output_dir.exists():
         output_dir.mkdir()
     with open(output_dir / 'selected.json', 'w') as f:
-        json.dump(selected, f, indent=True)
+        json.dump(selected, f, indent=True, cls=NumpyArrayEncoder)
     with open(output_dir / 'metric_vals.json', 'w') as f:
         json.dump(metric_vals, f, indent=True, cls=NumpyArrayEncoder)
 
