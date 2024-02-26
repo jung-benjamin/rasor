@@ -2,6 +2,7 @@
 """Simulate evolution with a genetic algorithm."""
 
 import logging
+import multiprocessing as mp
 from multiprocessing import Pool
 
 import numpy as np
@@ -24,8 +25,35 @@ class Fitness:
             for r in gene_pool
         }
         self.test_point = test_point
+        self.logger.info(f'Setting test point: {test_point}')
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
+
+    @property
+    def logger(self):
+        """Get logger."""
+        return logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def config_logger(cls,
+                      loglevel='INFO',
+                      logpath=None,
+                      formatstr='%(levelname)s:%(name)s:%(message)s'):
+        """Configure the logger."""
+        log = logging.getLogger(cls.__name__)
+        log.propagate = False
+        log.setLevel(getattr(logging, loglevel.upper()))
+        log.handlers.clear()
+        fmt = logging.Formatter(formatstr)
+        sh = logging.StreamHandler()
+        sh.setLevel(getattr(logging, loglevel.upper()))
+        sh.setFormatter(fmt)
+        log.addHandler(sh)
+        if logpath:
+            fh = logging.FileHandler(logpath)
+            fh.setLevel(getattr(logging, loglevel.upper()))
+            fh.setFormatter(fmt)
+            log.addHandler(fh)
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
@@ -79,6 +107,7 @@ class Evolution:
                       formatstr='%(levelname)s:%(name)s:%(message)s'):
         """Configure the logger."""
         log = logging.getLogger(cls.__name__)
+        log.propagate = False
         log.setLevel(getattr(logging, loglevel.upper()))
         log.handlers.clear()
         fmt = logging.Formatter(formatstr)
@@ -197,8 +226,20 @@ class Evolution:
         return best, fitness_evo
 
 
-def natural_selection(fitness_kws, evolution_kws, max_iter):
+def natural_selection(fitness_kws, evolution_kws, max_iter, log_kwargs=None):
     """Apply genetic selection"""
+    logging.getLogger().debug(f'Log kwargs in natural selection: {log_kwargs}')
+    if log_kwargs:
+        if mp.current_process().name != 'MainProcess':
+            fmt = log_kwargs.get('formatstr',
+                                 '%(levelname)s:%(name)s:%(message)s')
+            current_proc = mp.current_process().name
+            fmt_split = fmt.split(':')
+            fmt = ":".join([fmt_split[0]] + [current_proc] + fmt_split[-2:])
+            log_kwargs.update({'formatstr': fmt})
+        Evolution.config_logger(**log_kwargs)
+        MutationFactory.config_logger(**log_kwargs)
+        Fitness.config_logger(**log_kwargs)
     fitness_func = Fitness(**fitness_kws)
     island = Evolution(**evolution_kws, fitness_func=fitness_func)
     return island.darwinism(max_iter=max_iter)
@@ -256,6 +297,7 @@ class GalapagosIslands:
                       formatstr='%(levelname)s:%(name)s:%(message)s'):
         """Configure the logger."""
         log = logging.getLogger(cls.__name__)
+        log.propagate = False
         log.setLevel(getattr(logging, loglevel.upper()))
         log.handlers.clear()
         fmt = logging.Formatter(formatstr)
@@ -294,26 +336,22 @@ class GalapagosIslands:
             fitness_evolution.append(fitness)
         return best_genes, fitness_evolution
 
-    def _scan_multiproc(self, num_proc):
+    def _scan_multiproc(self, num_proc, log_kwargs):
         args = []
         for tp in self.test_points:
-            args.append((
-                {
-                    'gene_pool': self.gene_pool,
-                    'data': self.data,
-                    'marginal_kwargs': self.marginal_kwargs,
-                    'uncertainty_kwargs': self.uncertainty_kwargs,
-                    'test_point': tp
-                },
-                {
-                    'gene_pool': self.gene_pool,
-                    'mutations': self.mutations,
-                    'init_size': self.init_size,
-                    'init_length': self.init_length,
-                    'rng_seed': self.rng_seed
-                },
-                self.max_iter,
-            ))
+            args.append(({
+                'gene_pool': self.gene_pool,
+                'data': self.data,
+                'marginal_kwargs': self.marginal_kwargs,
+                'uncertainty_kwargs': self.uncertainty_kwargs,
+                'test_point': tp
+            }, {
+                'gene_pool': self.gene_pool,
+                'mutations': self.mutations,
+                'init_size': self.init_size,
+                'init_length': self.init_length,
+                'rng_seed': self.rng_seed
+            }, self.max_iter, log_kwargs))
         self.logger.debug(f'Length of multiprocessing args: {len(args)}')
         with Pool(processes=num_proc) as pool:
             output = pool.starmap(natural_selection, list(args))
@@ -323,10 +361,11 @@ class GalapagosIslands:
             fitness_evolution.append(f)
         return best_genes, fitness_evolution
 
-    def speciate(self, num_proc=1):
+    def speciate(self, num_proc=1, log_kwargs=None):
         """Run evolution for each test point."""
         if num_proc > 1:
-            best_genes, fitness_evolution = self._scan_multiproc(num_proc)
+            best_genes, fitness_evolution = self._scan_multiproc(
+                num_proc, log_kwargs=log_kwargs)
         else:
             best_genes, fitness_evolution = self._scan()
         return best_genes, fitness_evolution

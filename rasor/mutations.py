@@ -36,6 +36,7 @@ class Mutation(ABC):
                       formatstr='%(levelname)s:%(name)s:%(message)s'):
         """Configure the logger."""
         log = logging.getLogger(cls.__name__)
+        log.propagate = False
         log.setLevel(getattr(logging, loglevel.upper()))
         log.handlers.clear()
         fmt = logging.Formatter(formatstr)

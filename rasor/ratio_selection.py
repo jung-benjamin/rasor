@@ -34,6 +34,8 @@ def argparser():
     parser.add_argument('-o', '--output', help=output, type=Path)
     loglevel = 'Set global logging level.'
     parser.add_argument('-l', '--log-level', help=loglevel, default='WARNING')
+    logfile = 'Set path to logfile.'
+    parser.add_argument('-f', '--log-file', help=logfile, type=Path)
     return parser.parse_args()
 
 
@@ -77,14 +79,15 @@ def parse_input_file(infile):
         return battering_ram
 
 
-def select_ratios(algorithm, ncores=1):
+def select_ratios(algorithm, ncores=1, log_kwargs=None):
     """Use the algorithm to select isotopic ratios."""
     if isinstance(algorithm, Minotaur):
         afterwards = Aftermath(*algorithm.fight(num_proc=ncores))
         selected = afterwards.find_best_ratios()
         metric_vals = dict(zip(afterwards.keys, afterwards.matrix))
     elif isinstance(algorithm, GalapagosIslands):
-        selected, metric_vals = algorithm.speciate(num_proc=ncores)
+        selected, metric_vals = algorithm.speciate(num_proc=ncores,
+                                                   log_kwargs=log_kwargs)
     return selected, metric_vals
 
 
@@ -101,7 +104,12 @@ def store_results(selected, metric_vals, output_dir):
 def run_ratio_selection(args):
     """Run isotope ratio selection."""
     algorithm = parse_input_file(args.infile)
-    selected, metric = select_ratios(algorithm=algorithm, ncores=args.cores)
+    selected, metric = select_ratios(algorithm=algorithm,
+                                     ncores=args.cores,
+                                     log_kwargs={
+                                         'loglevel': args.log_level,
+                                         'logpath': args.log_file
+                                     })
     store_results(selected=selected,
                   metric_vals=metric,
                   output_dir=args.output)
@@ -131,5 +139,5 @@ def config_logging(loglevel='INFO',
 
 if __name__ == '__main__':
     args = argparser()
-    config_logging(loglevel=args.log_level)
+    config_logging(loglevel=args.log_level, logpath=args.log_file)
     run_ratio_selection(args)
