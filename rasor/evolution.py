@@ -172,7 +172,10 @@ class Evolution:
                                     self.mutation_fraction['elitism']))
         new_population.extend(elites)
         for m, mutation in self.mutations.items():
-            new_population.extend(mutation(elites))
+            try:
+                new_population.extend(mutation(elites))
+            except Exception as e:
+                self.logger.exception(f'Skipping mutation {m} due to error:')
 
         diff = population_size - len(new_population)
         if diff > 0:
@@ -184,8 +187,12 @@ class Evolution:
     def darwinism(self, max_iter=20):
         fitness_evo = []
         for i in range(max_iter):
+            self.logger.info(f'Generation {i}')
             fitness_evo.append(self.best_fitness_vals())
-            self.evolve()
+            try:
+                self.evolve()
+            except Exception as e:
+                self.logger.exception(f'Iteration {i} skipped due to error:')
         best = self.elitism(n=1)
         return best, fitness_evo
 

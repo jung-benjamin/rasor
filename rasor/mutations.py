@@ -81,6 +81,7 @@ class GeneSwap(Mutation):
         rest_pool = sorted(set(self.gene_pool) - set(fittest_pool))
         swapped = []
         for f in deepcopy(genes):
+            self.logger.debug(f'Length of gene: {len(f)}')
             _ = f.pop(self.rng.integers(len(f)))
             add = self.rng.choice(rest_pool, size=n, replace=False)
             for a in add:
