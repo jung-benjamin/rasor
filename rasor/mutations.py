@@ -81,12 +81,14 @@ class GeneSwap(Mutation):
         fittest_pool = pool_genes(genes)
         rest_pool = sorted(set(self.gene_pool) - set(fittest_pool))
         swapped = []
-        for f in deepcopy(genes):
-            self.logger.debug(f'Length of gene: {len(f)}')
-            _ = f.pop(self.rng.integers(len(f)))
+        for f in genes:
+            f_ = deepcopy(f)
+            self.logger.debug(f'Gene (len: {len(f_)}): {f_}')
+            _ = f_.pop(self.rng.integers(len(f_)))
             add = self.rng.choice(rest_pool, size=n, replace=False)
             for a in add:
-                swapped.append(f + [a])
+                swapped.append(f_ + [a])
+                self.logger.debug(f'Swapped gene: {f_ + [a]}')
         return swapped
 
 
@@ -124,9 +126,12 @@ class Deletion(Mutation):
         shortened = []
         for f in deepcopy(genes):
             if len(f) > self.min_len:
-                for i in range(n):
-                    _ = f.pop(self.rng.integers(len(f)))
-                    shortened.append(f)
+                delete_idx = self.rng.choice(range(len(f)),
+                                             size=min(n, len(f)))
+                for i in delete_idx:
+                    f_ = deepcopy(f)
+                    _ = f_.pop(i)
+                    shortened.append(f_)
             else:
                 continue
         return shortened
