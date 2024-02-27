@@ -2,11 +2,13 @@
 
 from setuptools import find_packages, setup
 
-setup(
-    name='rasor',
-    version='0.1.0',
-    author='Benjamin Jung',
-    license='BSD-3-Clause',
-    packages=find_packages(include=['rasor', 'rasor.*']),
-    description='Algorithms for selecting suitable isotopic ratios.',
-)
+setup(name='rasor',
+      version='0.1.0',
+      author='Benjamin Jung',
+      license='BSD-3-Clause',
+      packages=find_packages(include=['rasor', 'rasor.*']),
+      description='Algorithms for selecting suitable isotopic ratios.',
+      entry_points={
+          'console_scripts':
+          ['run_ratio_selection=rasor.command_line:run_ratio_selection']
+      })
