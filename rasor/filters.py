@@ -193,10 +193,11 @@ class NuclideFilter:
                 isotopes = [e for e in self.nuclides if reggy.fullmatch(e)]
                 self.data.loc[isotopes] *= (1 - fac)
 
-    def select_by_concentration(self, threshold=10e-9):
+    def select_by_concentration(self, threshold=10e-9, fraction=1):
         """Select nuclides if the concentration is above the threshold."""
         conc = self.data / self.data.sum(axis=0)
-        self.data = self.data[(conc >= threshold).all(axis=1)]
+        data_fraction = (conc >= threshold).sum(axis=1) / conc.shape[1]
+        self.data = self.data[(data_fraction >= fraction)]
 
     def get_ratio_options(self):
         """Determine possible ratios from isotope list"""
@@ -260,7 +261,7 @@ class NuclideFilter:
         """Reduce U and Pu content by the separation efficiency."""
         self.reduce_elements(['U', 'Pu'], factor=factor)
 
-    def filter(self, threshold):
+    def filter(self, threshold, fraction=1):
         """Filter nuclides by concentration threshold."""
         noble_isotopes = self.get_element_isotopes(NOBLE_GASES)
         if self.drop_noble_gases:
@@ -269,6 +270,6 @@ class NuclideFilter:
             self.filter_elements('O')
         self.excited_states_handler()
         self.reduce_actinides(self.actinide_reduction)
-        self.select_by_concentration(threshold=threshold)
+        self.select_by_concentration(threshold=threshold, fraction=fraction)
         if self.drop_noble_gas_progeny:
             self.filter_decay_chain(noble_isotopes)
