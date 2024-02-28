@@ -9,6 +9,8 @@ setup(name='rasor',
       packages=find_packages(include=['rasor', 'rasor.*']),
       description='Algorithms for selecting suitable isotopic ratios.',
       entry_points={
-          'console_scripts':
-          ['run_ratio_selection=rasor.command_line:run_ratio_selection']
+          'console_scripts': [
+              'run_ratio_selection=rasor.command_line:run_ratio_selection',
+              'run_pre_selection=rasor.command_line:run_pre_selection'
+          ]
       })
