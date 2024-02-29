@@ -3,9 +3,19 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from .filters import NuclideFilter
+
+
+class PathEncoder(json.JSONEncoder):
+    """JSONEncoder that supports Path objects."""
+
+    def default(self, obj):
+        if isinstance(obj, Path):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 def argparser():
@@ -80,12 +90,29 @@ def write_output(ratios, fp):
         raise FileExistsError(fp)
 
 
+def path_relto_home(x):
+    """Convert paths relative to home directory."""
+    home = Path(os.environ['HOME'])
+    if isinstance(x, Path):
+        return x.absolute().relative_to(home)
+    return x
+
+
+def store_metadata(args):
+    """Store pre-selection configuration parameters."""
+    d = {n: path_relto_home(it) for n, it in vars(args).items()}
+    meta_name = f'{args.outfile.stem}_meta.json'
+    with args.outfile.with_name(meta_name).open('w') as f:
+        json.dump(d, f, indent=True, cls=PathEncoder)
+
+
 def select_candidates():
     """Pre-select isotope ratio candidates"""
     args = argparser()
     ratios = get_ratio_candidates(args)
     print(f'Selected {len(ratios)} candidate ratios.')
     write_output(ratios=ratios, fp=args.outfile)
+    store_metadata(args=args)
 
 
 if __name__ == '__main__':
