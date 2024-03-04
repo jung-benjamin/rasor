@@ -78,6 +78,27 @@ class LegacyGridSampler(Sampler):
             return grid
 
 
+class InclusiveGridSampler(Sampler):
+    """Generate input samples on a regular grid.
+    
+    Includes the parameter space limits as points on the grid.
+    """
+
+    def _generate_samples(self, bin_number=100, two_dim=True):
+        """Generate samples on a regular grid.
+        
+        Divides the parameter space axes into equal-width bins and
+        uses the bin centers to create a meshgrid that covers the
+        space.
+        """
+        centers = np.linspace(*self.limits, bin_number).T
+        grid = np.array(np.meshgrid(*centers, indexing='ij'))
+        if two_dim:
+            return grid.reshape((self.dims, bin_number**self.dims)).T
+        else:
+            return grid
+
+
 class GridSampler(Sampler):
     """Generate input parameter samples on a regular grid."""
 
@@ -113,7 +134,8 @@ class SamplerFactory:
     _samplers = {
         'sobol': SobolSampler,
         'grid': GridSampler,
-        'legacy': LegacyGridSampler
+        'legacy': LegacyGridSampler,
+        'inclusive': InclusiveGridSampler
     }
 
     def get_sampler(self, method, **kwargs):
