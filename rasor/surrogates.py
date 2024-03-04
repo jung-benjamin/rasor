@@ -32,6 +32,11 @@ class Surrogate:
         i, j = r.split('/')
         return cls(x, y[i] / y[j])
 
+    @classmethod
+    def set_grid_size(cls, gs):
+        """Change the grid size."""
+        cls.GRID_SIZE = gs
+
     def _reshape_y(self):
         """Reshape the y data points."""
         self.y = self.y.reshape(self.GRID_SIZE, order='C')
@@ -46,9 +51,9 @@ class Surrogate:
         reshi = self.x.reshape(*(*self.GRID_SIZE, dims))
         spaces = []
         for i in range(dims):
-            sl = [slice(None)] * (dims + 1)
+            sl = [0] * (dims + 1)
             sl[-1] = i
-            sl[(dims - 1 - i)] = 0
+            sl[i] = slice(None)
             space = reshi[tuple(sl)]
             spaces.append(space.copy(order='C'))
         return spaces
