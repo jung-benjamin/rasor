@@ -65,6 +65,8 @@ def argparser():
                         help=outfile,
                         type=Path,
                         default=Path('ratio_candidates.json'))
+    write_data = 'File for storing the filtered data to csv.'
+    parser.add_argument('--write-data', help=write_data, type=Path)
     return parser.parse_args()
 
 
@@ -77,6 +79,8 @@ def get_ratio_candidates(args):
     nuclide_filter.actinide_reduction = args.actinide_reduction
     nuclide_filter.excited_states_handler = 'add'
     nuclide_filter.filter(args.threshold, fraction=args.fraction)
+    if args.write_data:
+        nuclide_filter.to_csv(args.write_data)
     ratios = nuclide_filter.get_ratio_options()
     return ratios
 
