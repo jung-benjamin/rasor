@@ -90,6 +90,10 @@ class NuclideFilter:
             dframe = pd.read_csv(csvfiles, index_col=0)
         return cls(dframe)
 
+    def to_csv(self, fp, **kwargs):
+        """Write the filtered data to a csv file."""
+        self.data.to_csv(fp, **kwargs)
+
     @property
     def nuclides(self):
         """Return the isotopes in the data."""
