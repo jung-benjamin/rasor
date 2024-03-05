@@ -65,8 +65,12 @@ class Surrogate:
         """
         self._set_x(x)
         self._set_y(y, key=key)
+        self.dims = x.shape[1]
         if grid_size:
             self.set_grid_size(grid_size)
+        else:
+            gs = (int(self.x.shape[0]**(1 / self.dims)), ) * self.dims
+            self.set_grid_size(gs)
         if not self.y.shape == self.GRID_SIZE:
             self._reshape_y()
         self._fill_nan()
