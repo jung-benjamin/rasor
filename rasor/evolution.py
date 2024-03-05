@@ -84,16 +84,33 @@ class Evolution:
         self.rng = np.random.default_rng(seed=rng_seed)
         self._set_initial_population()
         self.evaluate_fitness()
-        self.mutations = {
-            m:
-            MutationFactory().get_mutation(m,
-                                           population_size=init_size,
-                                           gene_length=init_length,
-                                           rng=self.rng,
-                                           gene_pool=self.gene_pool,
-                                           frequency=self.mutation_fraction[m])
-            for m in mutations
-        }
+        self._set_mutations(mutations=mutations)
+
+    def _set_mutations(self, mutations):
+        """Set the mutations and their frequency of occurence."""
+        if isinstance(mutations, (list, tuple, set)):
+            self.mutations = {
+                m:
+                MutationFactory().get_mutation(
+                    m,
+                    population_size=self.init_size,
+                    gene_length=self.init_length,
+                    rng=self.rng,
+                    gene_pool=self.gene_pool,
+                    frequency=self.mutation_fraction[m])
+                for m in mutations
+            }
+        elif isinstance(mutations, dict):
+            self.mutations = {
+                m:
+                MutationFactory().get_mutation(m,
+                                               population_size=self.init_size,
+                                               gene_length=self.init_length,
+                                               rng=self.rng,
+                                               gene_pool=self.gene_pool,
+                                               frequency=freq)
+                for m, freq in mutations.items()
+            }
 
     @property
     def logger(self):
