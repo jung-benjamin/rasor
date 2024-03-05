@@ -1,15 +1,59 @@
 #! /usr/bin/env python3
 """Surrogate models for isotopic ratios."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator, interp2d
+
+
+def load_json(fp):
+    """Load content of a json file."""
+    with open(fp) as f:
+        content = json.load(f)
+    return content
+
+
+def array_from_file(fp):
+    """Load a numpy array from a file.
+    
+    Infers file type from suffix. Handles .npy and
+    .json files.
+    """
+    fp = Path(fp)
+    _loaders = {
+        '.json': lambda x: np.array(load_json(x)),
+        '.npy': lambda x: np.load(x, allow_pickle=True)
+    }
+    loader = _loaders.get(fp.suffix)
+    if loader is None:
+        ValueError(f'Invalid file ending: {fp.suffix}')
+    return loader(fp)
+
+
+def dict_from_file(fp):
+    """Load a dictionary from a file.
+
+    Infers file type from suffix. Handles .npy and
+    .json files.
+    """
+    fp = Path(fp)
+    _loaders = {
+        '.json': lambda x: load_json(x),
+        '.npy': lambda x: np.load(x, allow_pickle=True).item()
+    }
+    loader = _loaders.get(fp.suffix)
+    if loader is None:
+        ValueError(f'Invalid file ending: {fp.suffix}')
+    return loader(fp)
 
 
 class Surrogate:
 
     GRID_SIZE = (25, 25)
 
-    def __init__(self, x, y, grid_size=None):
+    def __init__(self, x, y, key=None, grid_size=None):
         """Set the data.
         
         Parameters
@@ -19,14 +63,37 @@ class Surrogate:
         y: np.ndarray
             Y values of the interpolation data Shape is (num,)
         """
-        self.x = x
-        self.y = y
+        self._set_x(x)
+        self._set_y(y, key=key)
         if grid_size:
             self.set_grid_size(grid_size)
         if not self.y.shape == self.GRID_SIZE:
             self._reshape_y()
         self._fill_nan()
         self._set_interpolator()
+
+    def _set_x(self, x):
+        """Set the x values."""
+        if isinstance(x, (Path, str)):
+            self.x = array_from_file(Path(x))
+        elif isinstance(x, (list, np.ndarray)):
+            self.x = np.array(x)
+        else:
+            TypeError('Invalid data type for x.')
+
+    def _set_y(self, y, key=None):
+        """Set the y values."""
+        if isinstance(y, (Path, str)) and key is None:
+            self.y = array_from_file(Path(y))
+        elif isinstance(y, (Path, str)) and key:
+            d = dict_from_file(y)
+            self.y = np.array(d[key])
+        elif isinstance(y, (list, np.ndarray)):
+            self.y = np.array(y)
+        elif key and isinstance(y, dict):
+            self.y = np.array(y[key])
+        else:
+            TypeError('Invalid data type for y.')
 
     @classmethod
     def ratio_from_isotopes(cls, x, y, r, grid_size=None):
