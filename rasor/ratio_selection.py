@@ -63,7 +63,11 @@ def parse_input_file(infile):
                          allow_pickle=True)
         y_data = np.load(arg_dict['Likelihood']['surrogates']['y_file'],
                          allow_pickle=True).item()
-        data = (x_data, y_data)
+        data = {
+            'x': x_data,
+            'y': y_data,
+            'grid_size': arg_dict['Likelihood']['surrogates']['grid_size']
+        }
         islands = GalapagosIslands(
             gene_pool=ratios,
             test_points=test_points,

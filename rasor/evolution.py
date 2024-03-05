@@ -21,7 +21,7 @@ class Fitness:
     def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
                  marginal_kwargs):
         self.models = {
-            r: Surrogate.ratio_from_isotopes(*data, r=r)
+            r: Surrogate.ratio_from_isotopes(**data, r=r)
             for r in gene_pool
         }
         self.test_point = test_point

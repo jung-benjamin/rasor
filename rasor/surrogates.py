@@ -9,7 +9,7 @@ class Surrogate:
 
     GRID_SIZE = (25, 25)
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, grid_size=None):
         """Set the data.
         
         Parameters
@@ -21,16 +21,18 @@ class Surrogate:
         """
         self.x = x
         self.y = y
+        if grid_size:
+            self.set_grid_size(grid_size)
         if not self.y.shape == self.GRID_SIZE:
             self._reshape_y()
         self._fill_nan()
         self._set_interpolator()
 
     @classmethod
-    def ratio_from_isotopes(cls, x, y, r):
+    def ratio_from_isotopes(cls, x, y, r, grid_size=None):
         """Create surrogate of a ratio given nuclide data."""
         i, j = r.split('/')
-        return cls(x, y[i] / y[j])
+        return cls(x, y[i] / y[j], grid_size=grid_size)
 
     @classmethod
     def set_grid_size(cls, gs):
@@ -82,3 +84,25 @@ class LegacySurrogate(Surrogate):
     def __call__(self, *args):
         """Predict y values with interpolator"""
         return self.interpolator(*args)
+
+
+class SurrogateSoup:
+
+    def __init__(self, x, y, names):
+        self.models = {n: Surrogate(x, y[n]) for n in names}
+
+    @classmethod
+    def from_ratiolist(cls, x, y, ratios):
+        """Create models given istope data and ratio IDs."""
+        y_dict = {}
+        for r in ratios:
+            i, j = r.split('/')
+            y_dict[r] = y[i] / y[j]
+        return cls(x, y_dict, ratios)
+
+    def __call__(self, *args, ratios='all'):
+        """Evaluate models on parameter values."""
+        if ratios == 'all':
+            return {n: m(*args) for n, m in self.models.items()}
+        else:
+            return {r: self.models[r](*args) for r in ratios}
