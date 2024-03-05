@@ -153,23 +153,30 @@ class LegacySurrogate(Surrogate):
         return self.interpolator(*args)
 
 
-class SurrogateSoup:
-
-    def __init__(self, x, y, names):
-        self.models = {n: Surrogate(x, y[n]) for n in names}
+class SurrogateCollection(dict):
 
     @classmethod
-    def from_ratiolist(cls, x, y, ratios):
-        """Create models given istope data and ratio IDs."""
-        y_dict = {}
+    def from_ratiolist(cls, x, y, ratios, grid_size=None):
+        """Create a collection given a list or ratios and data."""
+        if isinstance(x, (list, np.ndarray)):
+            x = np.array(x)
+        elif isinstance(x, (Path, str)):
+            x = array_from_file(x)
+        else:
+            TypeError(f'Invalid type {type(x)} for x.')
+        if isinstance(y, dict):
+            y = {n: np.array(it) for n, it in y.items()}
+        elif isinstance(y, (Path, str)):
+            y = dict_from_file(y)
+            y = {n: np.array(it) for n, it in y.items()}
+        else:
+            TypeError(f'Invalid type {type(y)} for y.')
+        models = []
         for r in ratios:
             i, j = r.split('/')
-            y_dict[r] = y[i] / y[j]
-        return cls(x, y_dict, ratios)
+            models.append(Surrogate(x=x, y=y[i] / y[j], grid_size=grid_size))
+        return cls(zip(ratios, models))
 
-    def __call__(self, *args, ratios='all'):
-        """Evaluate models on parameter values."""
-        if ratios == 'all':
-            return {n: m(*args) for n, m in self.models.items()}
-        else:
-            return {r: self.models[r](*args) for r in ratios}
+    def modellist(self):
+        """Return list of the models."""
+        return list(self.values())

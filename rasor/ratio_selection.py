@@ -59,19 +59,10 @@ def parse_input_file(infile):
     test_points = arg_dict['Test_points']
     test_points.update({'limits': np.array(test_points.get('limits', limits))})
     if algorithm == 'genetic_evolution':
-        x_data = np.load(arg_dict['Likelihood']['surrogates']['x_file'],
-                         allow_pickle=True)
-        y_data = np.load(arg_dict['Likelihood']['surrogates']['y_file'],
-                         allow_pickle=True).item()
-        data = {
-            'x': x_data,
-            'y': y_data,
-            'grid_size': arg_dict['Likelihood']['surrogates']['grid_size']
-        }
         islands = GalapagosIslands(
             gene_pool=ratios,
             test_points=test_points,
-            data=data,
+            data=arg_dict['Likelihood']['surrogates'],
             marginal_kwargs=metric_kws,
             uncertainty_kwargs=arg_dict['Likelihood']['uncertainty'],
             **algorithm_kws[algorithm])

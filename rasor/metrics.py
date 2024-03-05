@@ -6,7 +6,7 @@ import numpy as np
 
 from .likelihood import GaussianLikelihood
 from .marginals import MarginalsFactory
-from .surrogates import Surrogate
+from .surrogates import SurrogateCollection
 
 
 class Metric(ABC):
@@ -48,14 +48,11 @@ class MarginalLikelihoodUncertainty:
         m_dict['limits'] = d['Metric'].get('limits', d['Problem']['limits'])
         marginals = m_fac.get_marginals(**m_dict)
         l_dict = d['Likelihood'].copy()
-        x = np.load(d['Likelihood']['surrogates']['x_file'], allow_pickle=True)
-        y = np.load(d['Likelihood']['surrogates']['y_file'],
-                    allow_pickle=True).item()
-        surrogate = [
-            Surrogate.ratio_from_isotopes(x=x, y=y, r=r)
-            for r in d['Problem']['ratios']
-        ]
-        likelihood = GaussianLikelihood(surrogates=surrogate,
+        models = SurrogateCollection.from_ratiolist(
+            **l_dict['surrogates'],
+            ratios=d['Problem']['ratios'],
+        )
+        likelihood = GaussianLikelihood(surrogates=models.modellist(),
                                         **l_dict['uncertainty'])
         return cls(likelihood=likelihood, marginals=marginals)
 

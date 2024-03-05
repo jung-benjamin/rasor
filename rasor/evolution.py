@@ -12,7 +12,7 @@ from .marginals import MarginalsFactory
 from .metrics import MaxLikelihoodUncertainty
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
-from .surrogates import Surrogate
+from .surrogates import SurrogateCollection
 
 
 class Fitness:
@@ -20,10 +20,8 @@ class Fitness:
 
     def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
                  marginal_kwargs):
-        self.models = {
-            r: Surrogate.ratio_from_isotopes(**data, r=r)
-            for r in gene_pool
-        }
+        self.models = SurrogateCollection.from_ratiolist(**data,
+                                                         ratios=gene_pool)
         self.test_point = test_point
         self.logger.info(f'Setting test point: {test_point}')
         self.uncertainty_kwargs = uncertainty_kwargs
