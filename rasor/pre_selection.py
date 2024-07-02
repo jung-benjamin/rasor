@@ -98,7 +98,10 @@ def path_relto_home(x):
     """Convert paths relative to home directory."""
     home = Path(os.environ['HOME'])
     if isinstance(x, Path):
-        return x.absolute().relative_to(home)
+        try:
+            return x.absolute().relative_to(home)
+        except ValueError:
+            return x
     return x
 
 
