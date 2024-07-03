@@ -11,6 +11,7 @@ setup(name='rasor',
       entry_points={
           'console_scripts': [
               'run_ratio_selection=rasor.command_line:run_ratio_selection',
-              'run_pre_selection=rasor.command_line:run_pre_selection'
+              'run_pre_selection=rasor.command_line:run_pre_selection',
+              'run_post_processing=rasor.command_line:run_post_processing'
           ]
       })

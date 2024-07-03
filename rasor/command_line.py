@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 """Provide access to functions via scripts."""
 
+from . import post_processing as pp
 from . import pre_selection as ps
 from . import ratio_selection as rs
 
@@ -15,3 +16,9 @@ def run_ratio_selection():
 def run_pre_selection():
     """Run pre selection algorithm."""
     ps.select_candidates()
+
+
+def run_post_processing():
+    """Run post processing algorithm."""
+    args = pp.argparser()
+    pp.run_post_processing(args)

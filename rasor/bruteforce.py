@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 """Select isotopic ratios by evaluating all combinations."""
 
+import json
 from itertools import combinations
 from multiprocessing import Pool
 
@@ -112,3 +113,23 @@ class Aftermath:
         """Find best ratio set for each grid point."""
         min_idx = self.matrix.argmin(axis=0)
         return self.keys[sorted(set(min_idx))]
+
+
+class LootCollector:
+    """Find the unique ratios among the selection of best ratio sets."""
+
+    def __init__(self, ratio_keys):
+        self.wreckage = ratio_keys
+
+    def find_unique(self):
+        """Reduce the list of ratio sets to a list of unique ratios."""
+        combined = []
+        for w in self.wreckage:
+            combined.extend(w.split(','))
+        return sorted(set(combined))
+
+    @classmethod
+    def from_json(cls, json_file):
+        """Create an instance from a JSON file."""
+        with open(json_file, 'r') as f:
+            return cls(ratio_keys=json.load(f))
