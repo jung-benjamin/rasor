@@ -77,7 +77,7 @@ def get_ratio_candidates(args):
     nuclide_filter.drop_noble_gas_progeny = args.drop_noble_progeny
     nuclide_filter.drop_oxygen = args.drop_oxygen
     nuclide_filter.actinide_reduction = args.actinide_reduction
-    nuclide_filter.excited_states_handler = 'add'
+    nuclide_filter.excited_states_handler = args.excited_states
     nuclide_filter.filter(args.threshold, fraction=args.fraction)
     if args.write_data:
         nuclide_filter.to_csv(args.write_data)
