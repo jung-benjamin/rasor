@@ -48,7 +48,10 @@ def fill_chain(nucl, chain):
         return
     chain |= set(prog)
     for p in prog:
-        fill_chain(p, chain)
+        if p == 'SF':
+            continue
+        else:
+            fill_chain(p, chain)
 
 
 def get_decay_chain(nuclide):
@@ -71,9 +74,8 @@ class NuclideFilter:
         """Create data"""
         self.data = data
         self.data.fillna(0, inplace=True)
-        self.drop_noble_gases = True
-        self.drop_oxygen = True
-        self.drop_noble_gas_progeny = True
+        self._drop_progeny = []
+        self._drop_elements = []
         self.actinide_reduction = 0.99
         self.excited_states_handler = 'keep'
 
@@ -99,35 +101,59 @@ class NuclideFilter:
         """Return the isotopes in the data."""
         return list(self.data.index)
 
-    @property
+    # @property
     def drop_noble_gases(self):
-        """Boolean flag for removing noble gases from data."""
-        return self._drop_noble_gases
-
-    @drop_noble_gases.setter
-    def drop_noble_gases(self, b):
-        """Set flag for removing noble gases from data."""
-        self._drop_noble_gases = b
+        """Add noble gases to drop list."""
+        self.drop_elements = NOBLE_GASES
 
     @property
+    def drop_progeny(self):
+        """Drop decay products of these elements."""
+        return self._drop_progeny
+
+    @drop_progeny.setter
+    def drop_progeny(self, elements):
+        """Add elements whose decay products are removed.
+        
+        The list of elements is sorted and duplicates are
+        removed.
+        """
+        if isinstance(elements, str):
+            self._drop_progeny.extend([elements])
+        elif isinstance(elements, (list, tuple, set)):
+            self._drop_progeny.extend(list(elements))
+        else:
+            raise ValueError(elements)
+        self._drop_progeny = sorted(set(self._drop_progeny))
+
+    # @property
     def drop_noble_gas_progeny(self):
-        """Boolean flag for removing noble gas decay products."""
-        return self._drop_noble_gas_progeny
-
-    @drop_noble_gas_progeny.setter
-    def drop_noble_gas_progeny(self, b):
-        """Set flag for dropping noble gas decay products."""
-        self._drop_noble_gas_progeny = b
+        """Add noble gas decay products to drop list.
+        
+        Calling this method adds all noble gases to the list
+        of elements whose decay products are removed.
+        """
+        self.drop_progeny = NOBLE_GASES
 
     @property
-    def drop_oxygen(self):
-        """Bolean flag for removing oxygen from data."""
-        return self._drop_oxygen
+    def drop_elements(self):
+        """List of elements that are removed from the data."""
+        return self._drop_elements
 
-    @drop_oxygen.setter
-    def drop_oxygen(self, b):
-        """Set flag for removing oxygen from data."""
-        self._drop_oxygen = b
+    @drop_elements.setter
+    def drop_elements(self, elements):
+        """Set elements to be removed from the data."""
+        if isinstance(elements, str):
+            self._drop_elements.extend([elements])
+        elif isinstance(elements, (list, tuple, set)):
+            self._drop_elements.extend(list(elements))
+        else:
+            raise ValueError(elements)
+        self._drop_elements = sorted(set(self._drop_elements))
+
+    def drop_oxygen(self):
+        """Add oxygen to the drop list."""
+        self.drop_elements = 'O'
 
     @property
     def actinide_reduction(self):
@@ -171,13 +197,19 @@ class NuclideFilter:
                 self.data = self.data.loc[isotopes]
 
     def filter_decay_chain(self, nuclide):
-        """Remove all nuclides in decay chain."""
+        """Remove all decay products of one or more nuclides.
+        
+        The nuclides themselves are not removed, even if they
+        appear in the decay chain of other nuclides. If they
+        should be removed, remove them separately.
+        """
         chain = set()
         if isinstance(nuclide, str):
             chain |= get_decay_chain(nuclide=nuclide)
         elif isinstance(nuclide, (tuple, list, set)):
             for n in nuclide:
                 chain |= get_decay_chain(nuclide=n)
+            chain -= set(nuclide)
         self.filter_nuclides(nuclides=list(chain))
 
     def reduce_elements(self, element, factor=0.99):
@@ -267,13 +299,12 @@ class NuclideFilter:
 
     def filter(self, threshold, fraction=1):
         """Filter nuclides by concentration threshold."""
-        noble_isotopes = self.get_element_isotopes(NOBLE_GASES)
-        if self.drop_noble_gases:
-            self.filter_elements(NOBLE_GASES)
-        if self.drop_oxygen:
-            self.filter_elements('O')
+        if self.drop_progeny:
+            drop_isotopes = self.get_element_isotopes(self.drop_progeny)
+        if self.drop_elements:
+            self.filter_elements(self.drop_elements)
         self.excited_states_handler()
         self.reduce_actinides(self.actinide_reduction)
         self.select_by_concentration(threshold=threshold, fraction=fraction)
-        if self.drop_noble_gas_progeny:
-            self.filter_decay_chain(noble_isotopes)
+        if self.drop_progeny:
+            self.filter_decay_chain(drop_isotopes)

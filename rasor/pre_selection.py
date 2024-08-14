@@ -55,6 +55,19 @@ def argparser():
                         help=act_reduction,
                         default=0.99,
                         type=float)
+    drop_element = 'List of elements to be removed from the data.'
+    parser.add_argument('--drop-element',
+                        help=drop_element,
+                        nargs='*',
+                        default=[])
+    drop_element_progeny = ('List of elements whose decay products are' +
+                            ' to be removed. The elements themselves' +
+                            ' are not removed by this option (and explicitly'
+                            ' kept, even if they are in other decay chains.).')
+    parser.add_argument('--drop-element-progeny',
+                        help=drop_element_progeny,
+                        nargs='*',
+                        default=[])
     excited_states = 'Select method for dealing with excited states.'
     parser.add_argument('--excited-states',
                         help=excited_states,
@@ -73,11 +86,16 @@ def argparser():
 def get_ratio_candidates(args):
     """Filter nuclides and determine possible ratios."""
     nuclide_filter = NuclideFilter.from_csv(args.datafile)
-    nuclide_filter.drop_noble_gases = args.drop_noble
-    nuclide_filter.drop_noble_gas_progeny = args.drop_noble_progeny
-    nuclide_filter.drop_oxygen = args.drop_oxygen
+    if args.drop_noble:
+        nuclide_filter.drop_noble_gases()
+    if args.drop_noble_progeny:
+        nuclide_filter.drop_noble_gas_progeny()
+    if args.drop_oxygen:
+        nuclide_filter.drop_oxygen()
     nuclide_filter.actinide_reduction = args.actinide_reduction
     nuclide_filter.excited_states_handler = args.excited_states
+    nuclide_filter.drop_progeny = args.drop_element_progeny
+    nuclide_filter.drop_elements = args.drop_element
     nuclide_filter.filter(args.threshold, fraction=args.fraction)
     if args.write_data:
         nuclide_filter.to_csv(args.write_data)
