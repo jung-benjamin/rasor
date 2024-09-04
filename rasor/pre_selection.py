@@ -73,6 +73,8 @@ def argparser():
                         help=excited_states,
                         choices=['keep', 'add', 'drop'],
                         default='keep')
+    exclude_file = 'JSON file with a list of nuclides to exclude.'
+    parser.add_argument('--exclude-file', help=exclude_file, type=Path)
     outfile = 'File path for storing the output in Json format.'
     parser.add_argument('--outfile',
                         help=outfile,
@@ -86,6 +88,10 @@ def argparser():
 def get_ratio_candidates(args):
     """Filter nuclides and determine possible ratios."""
     nuclide_filter = NuclideFilter.from_csv(args.datafile)
+    if args.exclude_file:
+        with args.exclude_file.open() as f:
+            exclude = json.load(f)
+        nuclide_filter.filter_nuclides(exclude)
     if args.drop_noble:
         nuclide_filter.drop_noble_gases()
     if args.drop_noble_progeny:
