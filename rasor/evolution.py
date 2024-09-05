@@ -4,6 +4,7 @@
 import logging
 import multiprocessing as mp
 from multiprocessing import Pool
+import json
 
 import numpy as np
 
@@ -384,3 +385,22 @@ class GalapagosIslands:
         else:
             best_genes, fitness_evolution = self._scan()
         return best_genes, fitness_evolution
+
+
+class GeneSequencer:
+    """Find unique set of ratios from the evolution results."""
+
+    def __init__(self, best_genes):
+        self.best_genes = np.array(best_genes)
+
+    def find_unique(self):
+        """Find unique set of genes."""
+        unique_genes = np.unique(self.best_genes)
+        return sorted(unique_genes)
+    
+    @classmethod
+    def from_json(cls, json_file):
+        """Create a GeneSequencer from a json file."""
+        with open(json_file, 'r') as f:
+            best_genes = json.load(f)
+        return cls(best_genes=best_genes)

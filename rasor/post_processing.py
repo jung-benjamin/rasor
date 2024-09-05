@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from rasor.bruteforce import LootCollector
+from rasor.evolution import GeneSequencer
 
 
 def argparser():
@@ -19,7 +20,7 @@ def argparser():
     parser.add_argument('-a',
                         '--algorithm',
                         help=algorithm,
-                        choices=['bruteforce'],
+                        choices=['bruteforce', 'evolution'],
                         default='bruteforce')
     return parser.parse_args()
 
@@ -29,11 +30,20 @@ def reduce_brute_force_selection(selection_file):
     looter = LootCollector.from_json(selection_file)
     return looter.find_unique()
 
+def reduce_genetic_evolution_selection(selection_file):
+    """Reduce the results of the genetic evolution selection."""
+    crispr = GeneSequencer.from_json(selection_file)
+    return crispr.find_unique()
+
 
 def run_post_processing(args):
     """Run the post processing."""
     if args.algorithm == 'bruteforce':
         unique_ratios = reduce_brute_force_selection(args.infile)
+        with open(args.outfile.with_suffix('.json'), 'w') as f:
+            json.dump(unique_ratios, f, indent=4)
+    elif args.algorithm == 'evolution':
+        unique_ratios = reduce_genetic_evolution_selection(args.infile)
         with open(args.outfile.with_suffix('.json'), 'w') as f:
             json.dump(unique_ratios, f, indent=4)
 
