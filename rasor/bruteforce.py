@@ -73,6 +73,11 @@ class Minotaur:
         """Iterator over all combinations of ratios."""
         return combinations(self.ratios, r=self.combo_length)
 
+    @classmethod
+    def set_combo_length(cls, length):
+        """Set the length of the ratio combinations."""
+        cls.combo_length = int(length)
+
     def _scan(self):
         matrices = {}
         for r in self.combinations():

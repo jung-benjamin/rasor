@@ -48,6 +48,7 @@ def parse_input_file(infile):
         arg_dict = json.load(f)
     if isinstance(arg_dict['Algorithm'], str):
         algorithm = arg_dict['Algorithm']
+        algorithm_kws = {}
     else:
         algorithm_kws = arg_dict['Algorithm']
         algorithm = list(algorithm_kws)[0]
@@ -71,6 +72,8 @@ def parse_input_file(infile):
         battering_ram = Minotaur(ratios=ratios,
                                  test_points=test_points,
                                  metric_params=arg_dict)
+        if 'combo_length' in algorithm_kws[algorithm]:
+            Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return battering_ram
 
 
