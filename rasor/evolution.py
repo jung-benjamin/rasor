@@ -1,10 +1,12 @@
 #! /usr/bin/env python3
 """Simulate evolution with a genetic algorithm."""
 
+import json
 import logging
 import multiprocessing as mp
+from functools import reduce
+from itertools import chain
 from multiprocessing import Pool
-import json
 
 import numpy as np
 
@@ -391,13 +393,13 @@ class GeneSequencer:
     """Find unique set of ratios from the evolution results."""
 
     def __init__(self, best_genes):
-        self.best_genes = np.array(best_genes)
+        self.best_genes = best_genes
 
     def find_unique(self):
         """Find unique set of genes."""
-        unique_genes = np.unique(self.best_genes)
+        unique_genes = set(chain(*chain.from_iterable(self.best_genes)))
         return sorted(unique_genes)
-    
+
     @classmethod
     def from_json(cls, json_file):
         """Create a GeneSequencer from a json file."""
