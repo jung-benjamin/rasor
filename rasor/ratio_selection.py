@@ -72,7 +72,7 @@ def parse_input_file(infile):
         battering_ram = Minotaur(ratios=ratios,
                                  test_points=test_points,
                                  metric_params=arg_dict)
-        if 'combo_length' in algorithm_kws[algorithm]:
+        if algorithm_kws.get(algorithm):
             Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return battering_ram
 
