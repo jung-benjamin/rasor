@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from rasor import config_global_logging
-from rasor.bruteforce import Aftermath, Minotaur
+from rasor.bruteforce import Aftermath, BabyMinotaur, Minotaur
 from rasor.evolution import GalapagosIslands
 
 
@@ -39,7 +39,11 @@ def argparser():
     return parser.parse_args()
 
 
-ALGORITHMS = {'brute_force': Minotaur, 'genetic_evolution': GalapagosIslands}
+ALGORITHMS = {
+    'brute_force': Minotaur,
+    'genetic_evolution': GalapagosIslands,
+    'baby_brute': BabyMinotaur
+}
 
 
 def parse_input_file(infile):
@@ -75,6 +79,13 @@ def parse_input_file(infile):
         if algorithm_kws.get(algorithm):
             Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return battering_ram
+    elif algorithm == 'baby_brute':
+        with open(algorithm_kws[algorithm].get('combination_file'), 'r') as f:
+            combinations = json.load(f)
+        baby = BabyMinotaur(combinations=combinations,
+                            test_points=test_points,
+                            metric_params=arg_dict)
+        return baby
 
 
 def select_ratios(algorithm, ncores=1, log_kwargs=None):

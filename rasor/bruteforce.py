@@ -106,6 +106,26 @@ class Minotaur:
         return keys, solubility
 
 
+class BabyMinotaur(Minotaur):
+    """Iterate over pre-generated list of combinations
+    
+    Baby Minotaur is not as strong as his father and needs help
+    calculating the combinations of ratios.
+    """
+
+    def __init__(self, combinations, test_points, metric_params):
+        self._combinations = combinations
+        self.test_points = test_points
+        self.metric_params = metric_params
+
+    def combinations(self):
+        return self._combinations
+
+    @classmethod
+    def set_combo_length(cls, length):
+        raise NotImplementedError('Baby Minotaur cannot change combo length')
+
+
 class Aftermath:
     """Analyze the aftermath of a minotaur fight."""
 
