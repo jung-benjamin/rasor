@@ -184,3 +184,8 @@ class SurrogateCollection(dict):
     def modellist(self):
         """Return list of the models."""
         return list(self.values())
+
+    def get_subset(self, keys):
+        """Return a subset of the collection."""
+        return SurrogateCollection({k: self[k] for k in keys})
+
