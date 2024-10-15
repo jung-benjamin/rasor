@@ -107,8 +107,54 @@ class LikelihoodModel(ABC):
         return self.joint_pdf(x)
 
 
+class LikelihoodLookUp(LikelihoodModel):
+    """Approximate the using lookup tables."""
+
+    def __init__(self, surrogates, uncertainty_model, test_point_mu, **kwargs):
+        """Set the test point and the surrogate models.
+        
+        Surrogates and test_point mu must be lists of surrogate evaluations
+        as calculated by the lookup tables.
+        """
+        self.surrogates = surrogates
+        self.uncertainty = UncertaintyFactory().get_model(
+            uncertainty_model, **kwargs)
+        self.mu = np.array(list(test_point_mu.values()))
+        self.calc_sigma()
+
+    def joint_pdf(self, x):
+        """Joint probability distribution function
+        
+        Assumes all variables are independent and the joint probability
+        is the product of each probability distribution function.
+        """
+        prob = 1
+        for func, mu, sigma in zip(self.surrogates.values(), self.mu,
+                                   self.sigma):
+            prob *= self.pdf(func, mu, sigma)
+        return prob
+
+    @property
+    def test_point(self):
+        """Test point on which likelihood is conditional."""
+        return self._test_point
+
+    @test_point.setter
+    def test_point(self, tp):
+        """Set a test point and calculate mu and sigma."""
+        self._test_point = tp
+
+
 class GaussianLikelihood(LikelihoodModel):
     """Likelihood function with normal distributions."""
+
+    def pdf(self, x, mu, sigma):
+        """Normal probability distribution function."""
+        return np.exp(-(x - mu)**2 / (2 * (sigma**2)))
+
+
+class GaussianLikelihoodLookUp(LikelihoodLookUp):
+    """Likelihood function with normal distributions using lookup tables."""
 
     def pdf(self, x, mu, sigma):
         """Normal probability distribution function."""
