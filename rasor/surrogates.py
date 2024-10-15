@@ -189,3 +189,31 @@ class SurrogateCollection(dict):
         """Return a subset of the collection."""
         return SurrogateCollection({k: self[k] for k in keys})
 
+
+class FrozenSurrogateLookUp(dict):
+    """Lookup table for surrogate models."""
+
+    @classmethod
+    def from_surrogate_collection(cls, collection, x):
+        """Create the lookup table."""
+        return cls((r, s(x)) for r, s in collection.items())
+
+    def __getitem__(self, key):
+        """Return surrogate model predictions from lookup table.
+        
+        Unlike the regular dict, this method accepts lists as an
+        argument and returns a list.
+        """
+        if isinstance(key, (list, tuple)):
+            return [
+                super(FrozenSurrogateLookUp, self).__getitem__(k) for k in key
+            ]
+        return super().__getitem__(key)
+
+    def get_subset(self, keys):
+        """Return a subset of the lookup table."""
+        return FrozenSurrogateLookUp({k: self[k] for k in keys})
+
+    def select_idx(self, idx):
+        """Return a subset of the lookup table."""
+        return FrozenSurrogateLookUp({k: self[k][idx] for k in self.keys()})
