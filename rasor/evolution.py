@@ -10,12 +10,12 @@ from multiprocessing import Pool
 
 import numpy as np
 
-from .likelihood import GaussianLikelihood
+from .likelihood import GaussianLikelihood, GaussianLikelihoodLookUp
 from .marginals import MarginalsFactory
 from .metrics import MaxLikelihoodUncertainty
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
-from .surrogates import SurrogateCollection
+from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
 
 
 class Fitness:
@@ -65,6 +65,53 @@ class Fitness:
         metric = MaxLikelihoodUncertainty(likelihood=likelihood,
                                           marginals=self.marginals)
         return metric(self.test_point)
+
+
+class FitnessLookup(Fitness):
+    """Evalute fitness using lookup-table-based classes."""
+
+    def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
+                 marginal_kwargs):
+        """Initialize the fitness function with lookkup tables.
+
+        Creates to instances of FrozenSurrogateLookUp, one for the
+        input samples and one for the test points.
+
+        Parameters
+        ----------
+        gene_pool : list(str)
+            List of isotopic ratios.
+        data : dict
+            Dictionary with x and y data for the interpolation-based
+            surrogate models.
+        test_points : np.ndarray
+            Array of test points for the likelihood evaluation.
+        uncertainty_kwargs : dict
+            Keyword arguments for the uncertainty model.
+        marginal_kwargs : dict
+            Keyword arguments for the marginal likelihood approximation.
+        """
+
+        self.models = SurrogateCollection.from_ratiolist(**data,
+                                                         ratios=gene_pool)
+        self.logger.info(f'Setting test points: {test_point}')
+        self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
+        self.marginals.create_samples()
+        self.uncertainty_kwargs = uncertainty_kwargs
+        self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+            self.models, self.marginals.samples)
+        self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+            self.models, test_point)
+
+    def __call__(self, gene):
+        """Evaluate the fitness function."""
+        likelihood = GaussianLikelihoodLookUp(
+            surrogates=self.surrogate_lookup.get_subset(gene),
+            test_point_mu=self.test_point_lookup.get_subset(gene),
+            **self.uncertainty_kwargs)
+        metric = MaxLikelihoodUncertainty(likelihood=likelihood,
+                                          marginals=self.marginals)
+        return metric(None)
 
 
 class Evolution:
@@ -244,7 +291,11 @@ class Evolution:
         return best, fitness_evo
 
 
-def natural_selection(fitness_kws, evolution_kws, max_iter, log_kwargs=None):
+def natural_selection(fitness_kws,
+                      evolution_kws,
+                      max_iter,
+                      log_kwargs=None,
+                      lookup=False):
     """Apply genetic selection"""
     logging.getLogger().debug(f'Log kwargs in natural selection: {log_kwargs}')
     if log_kwargs:
@@ -258,7 +309,10 @@ def natural_selection(fitness_kws, evolution_kws, max_iter, log_kwargs=None):
         Evolution.config_logger(**log_kwargs)
         MutationFactory.config_logger(**log_kwargs)
         Fitness.config_logger(**log_kwargs)
-    fitness_func = Fitness(**fitness_kws)
+    if lookup:
+        fitness_func = FitnessLookup(**fitness_kws)
+    else:
+        fitness_func = Fitness(**fitness_kws)
     island = Evolution(**evolution_kws, fitness_func=fitness_func)
     return island.darwinism(max_iter=max_iter)
 
@@ -276,7 +330,8 @@ class GalapagosIslands:
                  init_size=100,
                  init_length=10,
                  max_iter=20,
-                 rng_seed=12345):
+                 rng_seed=12345,
+                 use_lookup=False):
         """Define the test space and set the metric."""
         test_point_dispatcher = {
             np.ndarray: self.set_test_points,
@@ -293,6 +348,7 @@ class GalapagosIslands:
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginal_kwargs = marginal_kwargs
         self.max_iter = max_iter
+        self.use_lookup = use_lookup
 
     def set_test_points(self, tp):
         """Set the test point array."""
@@ -349,7 +405,8 @@ class GalapagosIslands:
             }
             best, fitness = natural_selection(fitness_kws=fit_kws,
                                               evolution_kws=evo_kws,
-                                              max_iter=self.max_iter)
+                                              max_iter=self.max_iter,
+                                              lookup=self.use_lookup)
             best_genes.append(best)
             fitness_evolution.append(fitness)
         return best_genes, fitness_evolution
@@ -369,7 +426,7 @@ class GalapagosIslands:
                 'init_size': self.init_size,
                 'init_length': self.init_length,
                 'rng_seed': self.rng_seed
-            }, self.max_iter, log_kwargs))
+            }, self.max_iter, log_kwargs, self.use_lookup))
         self.logger.debug(f'Length of multiprocessing args: {len(args)}')
         with Pool(processes=num_proc) as pool:
             output = pool.starmap(natural_selection, list(args))
