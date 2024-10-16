@@ -29,6 +29,7 @@ class Fitness:
         self.logger.info(f'Setting test point: {test_point}')
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
+        self.marginals.create_samples()
 
     @property
     def logger(self):
