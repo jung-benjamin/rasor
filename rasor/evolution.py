@@ -65,7 +65,7 @@ class Fitness:
             **self.uncertainty_kwargs)
         metric = MaxLikelihoodUncertainty(likelihood=likelihood,
                                           marginals=self.marginals)
-        return metric(self.test_point)
+        return metric()
 
 
 class FitnessLookup(Fitness):
@@ -112,7 +112,7 @@ class FitnessLookup(Fitness):
             **self.uncertainty_kwargs)
         metric = MaxLikelihoodUncertainty(likelihood=likelihood,
                                           marginals=self.marginals)
-        return metric(None)
+        return metric()
 
 
 class Evolution:

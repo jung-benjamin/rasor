@@ -20,9 +20,9 @@ class Metric(ABC):
         """A metric"""
         pass
 
-    def __call__(self, test_point):
+    def __call__(self):
         """Calculate the metric on a single test point."""
-        return self._metric_function(test_point)
+        return self._metric_function()
 
 
 class MarginalLikelihoodUncertainty:
@@ -33,9 +33,8 @@ class MarginalLikelihoodUncertainty:
         self.likelihood = likelihood
         self.marginals = marginals
 
-    def approximate_uncertainty(self, test_point):
+    def approximate_uncertainty(self):
         """Approximate uncertainty of likelihood marginals"""
-        self.likelihood.test_point = test_point
         self.marginals.calculate_marginals(self.likelihood)
         mu, sd = self.marginals.parameterize_marginals()
         return 100 * sd / mu
@@ -65,9 +64,9 @@ class MaxLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
                                                likelihood=likelihood,
                                                marginals=marginals)
 
-    def _metric_function(self, test_point):
+    def _metric_function(self):
         """Calculate maximum of marginal likelihood uncertainty."""
-        return max(self.approximate_uncertainty(test_point=test_point))
+        return max(self.approximate_uncertainty())
 
 
 class SqSumLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
@@ -78,7 +77,7 @@ class SqSumLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
                                                likelihood=likelihood,
                                                marginals=marginals)
 
-    def _metric_function(self, test_point):
+    def _metric_function(self):
         """Calculate maximum of marginal likelihood uncertainty."""
-        unc = self.approximate_uncertainty(test_point=test_point)
+        unc = self.approximate_uncertainty()
         return sum(u**2 for u in unc)
