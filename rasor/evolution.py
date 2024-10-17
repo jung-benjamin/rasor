@@ -12,7 +12,7 @@ import numpy as np
 
 from .likelihood import GaussianLikelihood, GaussianLikelihoodLookUp
 from .marginals import MarginalsFactory
-from .metrics import MaxLikelihoodUncertainty
+from .metrics import MaxLikelihoodUncertainty, MultiMetric
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
 from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
@@ -30,6 +30,12 @@ class Fitness:
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
         self.marginals.create_samples()
+        if len(test_point.shape) == 2:
+            self.num_test_points = test_point.shape[0]
+        elif len(test_point.shape) == 1:
+            self.num_test_points = 1
+        else:
+            raise ValueError(f'Invalid test point shape: {test_point.shape}')
 
     @property
     def logger(self):
@@ -59,12 +65,22 @@ class Fitness:
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
-        likelihood = GaussianLikelihood(
-            surrogates=[self.models[g] for g in gene],
-            test_point=self.test_point,
-            **self.uncertainty_kwargs)
-        metric = MaxLikelihoodUncertainty(likelihood=likelihood,
-                                          marginals=self.marginals)
+        if self.num_test_points == 1:
+            likelihood = GaussianLikelihood(
+                surrogates=[self.models[g] for g in gene],
+                test_point=self.test_point,
+                **self.uncertainty_kwargs)
+            metric = MaxLikelihoodUncertainty(likelihood=likelihood,
+                                              marginals=self.marginals)
+        else:
+            likelihoods = [
+                GaussianLikelihood(surrogates=[self.models[g] for g in gene],
+                                   test_point=self.test_point[i],
+                                   **self.uncertainty_kwargs)
+                for i in range(self.num_test_points)
+            ]
+            metric = MultiMetric(likelihoods=likelihoods,
+                                 marginals=self.marginals)
         return metric()
 
 
@@ -103,15 +119,33 @@ class FitnessLookup(Fitness):
             self.models, self.marginals.samples)
         self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
             self.models, test_point)
+        if len(test_point.shape) == 2:
+            self.num_test_points = test_point.shape[0]
+        elif len(test_point.shape) == 1:
+            self.num_test_points = 1
+        else:
+            raise ValueError(f'Invalid test point shape: {test_point.shape}')
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
-        likelihood = GaussianLikelihoodLookUp(
-            surrogates=self.surrogate_lookup.get_subset(gene),
-            test_point_mu=self.test_point_lookup.get_subset(gene),
-            **self.uncertainty_kwargs)
-        metric = MaxLikelihoodUncertainty(likelihood=likelihood,
-                                          marginals=self.marginals)
+        if self.num_test_points == 1:
+            likelihood = GaussianLikelihoodLookUp(
+                surrogates=self.surrogate_lookup.get_subset(gene),
+                test_point_mu=self.test_point_lookup.get_subset(gene),
+                **self.uncertainty_kwargs)
+            metric = MaxLikelihoodUncertainty(likelihood=likelihood,
+                                              marginals=self.marginals)
+        else:
+            likelihoods = [
+                GaussianLikelihoodLookUp(
+                    surrogates=self.surrogate_lookup.get_subset(gene),
+                    test_point_mu=self.test_point_lookup.get_subset(
+                        gene).select_idx(i),
+                    **self.uncertainty_kwargs)
+                for i in range(self.num_test_points)
+            ]
+            metric = MultiMetric(likelihoods=likelihoods,
+                                 marginals=self.marginals)
         return metric()
 
 
@@ -332,7 +366,8 @@ class GalapagosIslands:
                  init_length=10,
                  max_iter=20,
                  rng_seed=12345,
-                 use_lookup=False):
+                 use_lookup=False,
+                 use_combined=False):
         """Define the test space and set the metric."""
         test_point_dispatcher = {
             np.ndarray: self.set_test_points,
@@ -350,6 +385,7 @@ class GalapagosIslands:
         self.marginal_kwargs = marginal_kwargs
         self.max_iter = max_iter
         self.use_lookup = use_lookup
+        self.use_combined = use_combined
 
     def set_test_points(self, tp):
         """Set the test point array."""
@@ -385,6 +421,32 @@ class GalapagosIslands:
             fh.setLevel(getattr(logging, loglevel.upper()))
             fh.setFormatter(fmt)
             log.addHandler(fh)
+
+    def _combine(self):
+        """Run evolution with combined test points.
+        
+        The fitness fuction uses a metric that combines all
+        test points into a single value.
+        """
+        fit_kws = {
+            'gene_pool': self.gene_pool,
+            'data': self.data,
+            'marginal_kwargs': self.marginal_kwargs,
+            'uncertainty_kwargs': self.uncertainty_kwargs,
+            'test_point': self.test_points
+        }
+        evo_kws = {
+            'gene_pool': self.gene_pool,
+            'mutations': self.mutations,
+            'init_size': self.init_size,
+            'init_length': self.init_length,
+            'rng_seed': self.rng_seed
+        }
+        best, fitness = natural_selection(fitness_kws=fit_kws,
+                                          evolution_kws=evo_kws,
+                                          max_iter=self.max_iter,
+                                          lookup=self.use_lookup)
+        return best, fitness
 
     def _scan(self):
         """Iterate over the test points and run evolution"""
@@ -439,11 +501,14 @@ class GalapagosIslands:
 
     def speciate(self, num_proc=1, log_kwargs=None):
         """Run evolution for each test point."""
-        if num_proc > 1:
-            best_genes, fitness_evolution = self._scan_multiproc(
-                num_proc, log_kwargs=log_kwargs)
+        if self.use_combined:
+            best_genes, fitness_evolution = self._combine()
         else:
-            best_genes, fitness_evolution = self._scan()
+            if num_proc > 1:
+                best_genes, fitness_evolution = self._scan_multiproc(
+                    num_proc, log_kwargs=log_kwargs)
+            else:
+                best_genes, fitness_evolution = self._scan()
         return best_genes, fitness_evolution
 
 
