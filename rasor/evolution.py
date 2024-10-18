@@ -21,8 +21,13 @@ from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
 class Fitness:
     """Fitness function for genetic algorithms."""
 
-    def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
-                 marginal_kwargs):
+    def __init__(self,
+                 gene_pool,
+                 data,
+                 test_point,
+                 uncertainty_kwargs,
+                 marginal_kwargs,
+                 num_proc=1):
         self.models = SurrogateCollection.from_ratiolist(**data,
                                                          ratios=gene_pool)
         self.test_point = test_point
@@ -80,15 +85,21 @@ class Fitness:
                 for i in range(self.num_test_points)
             ]
             metric = MultiMetric(likelihoods=likelihoods,
-                                 marginals=self.marginals)
+                                 marginals=self.marginals,
+                                 num_proc=self.num_proc)
         return metric()
 
 
 class FitnessLookup(Fitness):
     """Evalute fitness using lookup-table-based classes."""
 
-    def __init__(self, gene_pool, data, test_point, uncertainty_kwargs,
-                 marginal_kwargs):
+    def __init__(self,
+                 gene_pool,
+                 data,
+                 test_point,
+                 uncertainty_kwargs,
+                 marginal_kwargs,
+                 num_proc=1):
         """Initialize the fitness function with lookkup tables.
 
         Creates to instances of FrozenSurrogateLookUp, one for the
@@ -125,6 +136,7 @@ class FitnessLookup(Fitness):
             self.num_test_points = 1
         else:
             raise ValueError(f'Invalid test point shape: {test_point.shape}')
+        self.num_proc = num_proc
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
@@ -145,7 +157,8 @@ class FitnessLookup(Fitness):
                 for i in range(self.num_test_points)
             ]
             metric = MultiMetric(likelihoods=likelihoods,
-                                 marginals=self.marginals)
+                                 marginals=self.marginals,
+                                 num_proc=self.num_proc)
         return metric()
 
 
@@ -422,7 +435,7 @@ class GalapagosIslands:
             fh.setFormatter(fmt)
             log.addHandler(fh)
 
-    def _combine(self):
+    def _combine(self, num_proc=1):
         """Run evolution with combined test points.
         
         The fitness fuction uses a metric that combines all
@@ -433,7 +446,8 @@ class GalapagosIslands:
             'data': self.data,
             'marginal_kwargs': self.marginal_kwargs,
             'uncertainty_kwargs': self.uncertainty_kwargs,
-            'test_point': self.test_points
+            'test_point': self.test_points,
+            'num_proc': num_proc
         }
         evo_kws = {
             'gene_pool': self.gene_pool,
@@ -502,7 +516,7 @@ class GalapagosIslands:
     def speciate(self, num_proc=1, log_kwargs=None):
         """Run evolution for each test point."""
         if self.use_combined:
-            best_genes, fitness_evolution = self._combine()
+            best_genes, fitness_evolution = self._combine(num_proc=num_proc)
         else:
             if num_proc > 1:
                 best_genes, fitness_evolution = self._scan_multiproc(

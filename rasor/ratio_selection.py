@@ -8,6 +8,7 @@ from json import JSONEncoder
 from pathlib import Path
 
 import numpy as np
+from mpi4py import MPI
 
 from rasor import config_global_logging
 from rasor.bruteforce import Aftermath, BabyMinotaur, Minotaur
@@ -119,9 +120,10 @@ def run_ratio_selection(args):
                                          'loglevel': args.log_level,
                                          'logpath': args.log_file
                                      })
-    store_results(selected=selected,
-                  metric_vals=metric,
-                  output_dir=args.output)
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        store_results(selected=selected,
+                      metric_vals=metric,
+                      output_dir=args.output)
 
 
 def config_logging(loglevel='INFO',
