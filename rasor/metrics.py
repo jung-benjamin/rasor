@@ -27,18 +27,46 @@ class Metric(ABC):
         return self._metric_function()
 
 
-class MarginalLikelihoodUncertainty:
-    """Approximate relative uncertainty of marginals of likelihood."""
+class MarginalScore(ABC):
+    """Metric score derived from marginal likelihoods."""
 
     def __init__(self, likelihood, marginals):
         """Instantiate the metric."""
         self.likelihood = likelihood
         self.marginals = marginals
 
-    def approximate_uncertainty(self):
-        """Approximate uncertainty of likelihood marginals"""
+    def _parametrize_marginals(self):
+        """Parameterize the marginals.
+        
+        Calculate the mean and standard deviation of the marginal likelihoods.
+
+        Returns
+        -------
+        mu : np.ndarray(float)
+            Mean of the marginal likelihoods.
+        sd : np.ndarray(float)
+            Standard deviation of the marginal likelihoods.
+        """
         self.marginals.calculate_marginals(self.likelihood)
         mu, sd = self.marginals.parameterize_marginals()
+        return mu, sd
+
+    @abstractmethod
+    def _score(self):
+        """Calculate the metric score."""
+        pass
+
+    def __call__(self):
+        """Calculate the metric score."""
+        return self._score()
+
+
+class MarginalLikelihoodUncertainty(MarginalScore):
+    """Approximate relative uncertainty of marginals of likelihood."""
+
+    def _score(self):
+        """Calculate the metric score."""
+        mu, sd = self._parametrize_marginals()
         return 100 * sd / mu
 
     @classmethod
@@ -58,43 +86,134 @@ class MarginalLikelihoodUncertainty:
         return cls(likelihood=likelihood, marginals=marginals)
 
 
-class MaxLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
-    """Maximum of marginal likelihood uncertainty"""
+class MarginalMeanDistance(MarginalScore):
+    """Relative distance of marginal mean to the test point."""
 
-    def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(self,
-                                               likelihood=likelihood,
-                                               marginals=marginals)
+    def _score(self):
+        """Calculate the metric score."""
+        mu, _ = self._parametrize_marginals()
+        return 100 * np.abs(
+            mu - self.likelihood.test_point) / self.likelihood.test_point
+
+
+class CombinedDistanceUncertaintyScore(MarginalScore):
+    """Combined score of distance and uncertainty."""
+
+    def _score(self):
+        """Calculate the metric score."""
+        mu, sd = self._parametrize_marginals()
+        distance = np.abs(
+            mu - self.likelihood.test_point) / self.likelihood.test_point
+        uncertainty = sd / mu
+        return 100 * (distance + uncertainty)
+
+
+class MarginalScoreFactory:
+    """Factory for creating marginal score metrics."""
+
+    score_dispatcher = {
+        'uncertainty': MarginalLikelihoodUncertainty,
+        'distance': MarginalMeanDistance,
+        'combined': CombinedDistanceUncertaintyScore
+    }
+
+    def __init__(self, marginals):
+        """Instantiate the factory."""
+        self.marginals = marginals
+
+    def get_score(self, score_type, likelihood, **kwargs):
+        """Create a marginal score metric."""
+        return self.score_dispatcher[score_type](likelihood=likelihood,
+                                                 marginals=self.marginals,
+                                                 **kwargs)
+
+
+class MaxScore(Metric):
+    """Use maximum of marginal scores of each parameter as the metric."""
+
+    def __init__(self, likelihood, marginals, score_type, **kwargs):
+        """Instantiate the metric."""
+        self.score = MarginalScoreFactory(marginals).get_score(
+            score_type=score_type, likelihood=likelihood, **kwargs)
 
     def _metric_function(self):
-        """Calculate maximum of marginal likelihood uncertainty."""
-        return max(self.approximate_uncertainty())
+        return max(self.score())
 
 
-class SqSumLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
-    """Squared sum of marginal likelihood uncertainties"""
+class SquaredSumScore(Metric):
+    """Use squared sum of marginal scores as the metric."""
 
-    def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(self,
-                                               likelihood=likelihood,
-                                               marginals=marginals)
+    def __init__(self, likelihood, marginals, score_type, **kwargs):
+        """Instantiate the metric."""
+        self.score = MarginalScoreFactory(marginals).get_score(
+            score_type=score_type, likelihood=likelihood, **kwargs)
 
     def _metric_function(self):
-        """Calculate maximum of marginal likelihood uncertainty."""
-        unc = self.approximate_uncertainty()
-        return sum(u**2 for u in unc)
+        return sum(s**2 for s in self.score())
 
 
 def caller(f):
     return f()
 
 
+class SingleMetric(Metric):
+    """Calculate a metric for a single test point."""
+
+    _metric_types = {
+        'max': MaxScore,
+        'sum': SquaredSumScore,
+    }
+
+    def __init__(self,
+                 likelihood,
+                 marginals,
+                 metric_type='max',
+                 score_type='uncertainty'):
+        """Set the likelihoods and the metric type."""
+        self.likelihood = likelihood
+        self.marginals = marginals
+        self.metric_func = self._metric_types[metric_type](
+            likelihood=likelihood, marginals=marginals, score_type=score_type)
+
+    def _metric_function(self):
+        return self.metric_func()
+
+    @classmethod
+    def from_dict(cls, d):
+        """Instantiate class from dictionary."""
+        m_fac = MarginalsFactory()
+        m_dict = d['Marginals'].copy()
+        m_dict['limits'] = np.array(d['Metric'].get('limits',
+                                                    d['Problem']['limits']))
+        marginals = m_fac.get_marginals(**m_dict)
+        l_dict = d['Likelihood'].copy()
+        models = SurrogateCollection.from_ratiolist(
+            **l_dict['surrogates'],
+            ratios=d['Problem']['ratios'],
+        )
+        likelihood = GaussianLikelihood(surrogates=models.modellist(),
+                                        **l_dict['uncertainty'])
+        return cls(likelihood=likelihood, marginals=marginals, **d['Metric'])
+
+
 class MultiMetric(Metric):
 
-    def __init__(self, likelihoods, marginals, num_proc=1):
+    _metric_types = {
+        'max': MaxScore,
+        'sum': SquaredSumScore,
+    }
+
+    def __init__(self,
+                 likelihoods,
+                 marginals,
+                 num_proc=1,
+                 metric_type='max',
+                 score_type='uncertainty'):
         self.likelihoods = likelihoods
         self.marginals = marginals
         self.num_proc = num_proc
+        self.metric_func = self._metric_types[metric_type]
+        self.score_type = score_type
 
     def _metric_function(self):
 
@@ -111,9 +230,9 @@ class MultiMetric(Metric):
             # scatter the chunks to all processes
             chunk = comm.scatter(chunks, root=0)
             mlu = [
-                MaxLikelihoodUncertainty(likelihood=ll,
-                                         marginals=self.marginals)()
-                for ll in chunk
+                self.metric_func(likelihood=ll,
+                                 marginals=self.marginals,
+                                 score_type=self.score_type)() for ll in chunk
             ]
             # gather the results from all processes
             mlu = comm.gather(mlu, root=0)
@@ -129,15 +248,17 @@ class MultiMetric(Metric):
         elif self.num_proc > 1:
             with Pool(self.num_proc) as p:
                 mlu = [
-                    MaxLikelihoodUncertainty(likelihood=ll,
-                                             marginals=self.marginals)
+                    self.metric_func(likelihood=ll,
+                                     marginals=self.marginals,
+                                     score_type=self.score_type)
                     for ll in self.likelihoods
                 ]
                 # args = [(ll, self.marginals) for ll in self.likelihoods]
                 return np.mean(p.map(caller, mlu))
         else:
             return np.mean([
-                MaxLikelihoodUncertainty(likelihood=ll,
-                                         marginals=self.marginals)()
+                self.metric_func(likelihood=ll,
+                                 marginals=self.marginals,
+                                 score_type=self.score_type)()
                 for ll in self.likelihoods
             ])

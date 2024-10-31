@@ -8,7 +8,7 @@ from multiprocessing import Pool
 import numpy as np
 from tqdm import tqdm
 
-from .metrics import MaxLikelihoodUncertainty
+from .metrics import SingleMetric
 from .sampling import SamplerFactory
 
 
@@ -44,13 +44,13 @@ class SolubilityMatrix:
     @classmethod
     def from_dict(cls, d):
         """Construct class from parameters in a dictionary"""
-        metric = MaxLikelihoodUncertainty.from_dict(d=d)
+        metric = SingleMetric.from_dict(d=d)
         return cls(metric=metric, test_points=d['Test_points'])
 
 
 def get_metric(ratios, param_dict):
     param_dict['Problem'].update({'ratios': ratios})
-    return MaxLikelihoodUncertainty.from_dict(param_dict)
+    return SingleMetric.from_dict(param_dict)
 
 
 def evaluate_solubility_matrix(ratios, test_points, metric_params):

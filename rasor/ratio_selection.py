@@ -61,8 +61,9 @@ def parse_input_file(infile):
     ratios = arg_dict['Problem']['ratios']
     logging.info(f'Number of unique ratios: {len(set(ratios))}')
     limits = arg_dict['Problem']['limits']
-    metric_kws = arg_dict['Metric']
-    metric_kws.update({'limits': np.array(metric_kws.get('limits', limits))})
+    marginal_kws = arg_dict['Marginals']
+    marginal_kws.update(
+        {'limits': np.array(marginal_kws.get('limits', limits))})
     test_points = arg_dict['Test_points']
     test_points.update({'limits': np.array(test_points.get('limits', limits))})
     if algorithm == 'genetic_evolution':
@@ -70,7 +71,8 @@ def parse_input_file(infile):
             gene_pool=ratios,
             test_points=test_points,
             data=arg_dict['Likelihood']['surrogates'],
-            marginal_kwargs=metric_kws,
+            marginal_kwargs=marginal_kws,
+            metric_kwargs=arg_dict['Metric'],
             uncertainty_kwargs=arg_dict['Likelihood']['uncertainty'],
             **algorithm_kws[algorithm])
         return islands
