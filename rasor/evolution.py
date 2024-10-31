@@ -9,6 +9,7 @@ from itertools import chain
 from multiprocessing import Pool
 
 import numpy as np
+from tqdm import tqdm, trange
 
 from .likelihood import GaussianLikelihood, GaussianLikelihoodLookUp
 from .marginals import MarginalsFactory
@@ -328,7 +329,7 @@ class Evolution:
 
     def darwinism(self, max_iter=20):
         fitness_evo = []
-        for i in range(max_iter):
+        for i in trange(max_iter, disable=None):
             self.logger.info(f'Generation {i}')
             fitness_evo.append(self.best_fitness_vals())
             try:
@@ -465,7 +466,7 @@ class GalapagosIslands:
     def _scan(self):
         """Iterate over the test points and run evolution"""
         best_genes, fitness_evolution = [], []
-        for tp in self.test_points:
+        for tp in tqdm(self.test_points, disable=None):
             fit_kws = {
                 'gene_pool': self.gene_pool,
                 'data': self.data,

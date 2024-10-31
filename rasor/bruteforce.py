@@ -6,6 +6,7 @@ from itertools import combinations
 from multiprocessing import Pool
 
 import numpy as np
+from tqdm import tqdm
 
 from .metrics import MaxLikelihoodUncertainty
 from .sampling import SamplerFactory
@@ -81,7 +82,7 @@ class Minotaur:
 
     def _scan(self):
         matrices = {}
-        for r in self.combinations():
+        for r in tqdm(self.combinations(), disable=None):
             matrices[','.join(r)] = evaluate_solubility_matrix(
                 ratios=r,
                 test_points=self.test_points,
