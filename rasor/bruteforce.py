@@ -37,7 +37,8 @@ class SolubilityMatrix:
         """Evaluate the metric on each test_point."""
         self.matrix = np.empty(self.test_points.shape[0])
         for i, tp in enumerate(self.test_points):
-            self.matrix[i] = self.metric(tp)
+            self.metric.likelihood.test_point = tp
+            self.matrix[i] = self.metric()
 
     @classmethod
     def from_dict(cls, d):
