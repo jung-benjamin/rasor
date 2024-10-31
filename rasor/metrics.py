@@ -191,10 +191,22 @@ def caller(f):
 
 class MultiMetric(Metric):
 
-    def __init__(self, likelihoods, marginals, num_proc=1):
+    _metric_types = {
+        'max': MaxScore,
+        'sum': SquaredSumScore,
+    }
+
+    def __init__(self,
+                 likelihoods,
+                 marginals,
+                 num_proc=1,
+                 metric_type='max',
+                 score_type='uncertainty'):
         self.likelihoods = likelihoods
         self.marginals = marginals
         self.num_proc = num_proc
+        self.metric_func = self._metric_types[metric_type]
+        self.score_type = score_type
 
     def _metric_function(self):
 
@@ -211,9 +223,9 @@ class MultiMetric(Metric):
             # scatter the chunks to all processes
             chunk = comm.scatter(chunks, root=0)
             mlu = [
-                MaxLikelihoodUncertainty(likelihood=ll,
-                                         marginals=self.marginals)()
-                for ll in chunk
+                self.metric_func(likelihood=ll,
+                                 marginals=self.marginals,
+                                 score_type=self.score_type)() for ll in chunk
             ]
             # gather the results from all processes
             mlu = comm.gather(mlu, root=0)
@@ -229,15 +241,17 @@ class MultiMetric(Metric):
         elif self.num_proc > 1:
             with Pool(self.num_proc) as p:
                 mlu = [
-                    MaxLikelihoodUncertainty(likelihood=ll,
-                                             marginals=self.marginals)
+                    self.metric_func(likelihood=ll,
+                                     marginals=self.marginals,
+                                     score_type=self.score_type)
                     for ll in self.likelihoods
                 ]
                 # args = [(ll, self.marginals) for ll in self.likelihoods]
                 return np.mean(p.map(caller, mlu))
         else:
             return np.mean([
-                MaxLikelihoodUncertainty(likelihood=ll,
-                                         marginals=self.marginals)()
+                self.metric_func(likelihood=ll,
+                                 marginals=self.marginals,
+                                 score_type=self.score_type)()
                 for ll in self.likelihoods
             ])
