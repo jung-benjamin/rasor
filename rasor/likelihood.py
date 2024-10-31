@@ -110,7 +110,8 @@ class LikelihoodModel(ABC):
 class LikelihoodLookUp(LikelihoodModel):
     """Approximate the using lookup tables."""
 
-    def __init__(self, surrogates, uncertainty_model, test_point_mu, **kwargs):
+    def __init__(self, surrogates, uncertainty_model, test_point_mu,
+                 test_point, **kwargs):
         """Set the test point and the surrogate models.
         
         Surrogates and test_point mu must be lists of surrogate evaluations
@@ -121,6 +122,7 @@ class LikelihoodLookUp(LikelihoodModel):
             uncertainty_model, **kwargs)
         self.mu = np.array(list(test_point_mu.values()))
         self.calc_sigma()
+        self.test_point = test_point
 
     def joint_pdf(self, x):
         """Joint probability distribution function
@@ -136,12 +138,12 @@ class LikelihoodLookUp(LikelihoodModel):
 
     @property
     def test_point(self):
-        """Test point on which likelihood is conditional."""
+        """Test point(s) on which likelihood is conditional."""
         return self._test_point
 
     @test_point.setter
     def test_point(self, tp):
-        """Set a test point and calculate mu and sigma."""
+        """Set a test point."""
         self._test_point = tp
 
 
