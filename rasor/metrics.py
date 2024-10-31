@@ -64,12 +64,6 @@ class MarginalScore(ABC):
 class MarginalLikelihoodUncertainty(MarginalScore):
     """Approximate relative uncertainty of marginals of likelihood."""
 
-    def approximate_uncertainty(self):
-        """Approximate uncertainty of likelihood marginals"""
-        self.marginals.calculate_marginals(self.likelihood)
-        mu, sd = self._parametrize_marginals()
-        return 100 * sd / mu
-
     def _score(self):
         """Calculate the metric score."""
         mu, sd = self._parametrize_marginals()
@@ -156,33 +150,6 @@ class SquaredSumScore(Metric):
 
     def _metric_function(self):
         return sum(s**2 for s in self.score())
-
-
-class MaxLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
-    """Maximum of marginal likelihood uncertainty"""
-
-    def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(self,
-                                               likelihood=likelihood,
-                                               marginals=marginals)
-
-    def _metric_function(self):
-        """Calculate maximum of marginal likelihood uncertainty."""
-        return max(self.approximate_uncertainty())
-
-
-class SqSumLikelihoodUncertainty(MarginalLikelihoodUncertainty, Metric):
-    """Squared sum of marginal likelihood uncertainties"""
-
-    def __init__(self, likelihood, marginals):
-        MarginalLikelihoodUncertainty.__init__(self,
-                                               likelihood=likelihood,
-                                               marginals=marginals)
-
-    def _metric_function(self):
-        """Calculate maximum of marginal likelihood uncertainty."""
-        unc = self.approximate_uncertainty()
-        return sum(u**2 for u in unc)
 
 
 def caller(f):
