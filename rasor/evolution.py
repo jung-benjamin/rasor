@@ -309,6 +309,7 @@ class Evolution:
         between the specified fraction and the initial size is filled
         with novelty search.
         """
+        self.logger.info(f'Current population: {self.population}')
         population_size = self.init_size
         new_population = []
         elites = self.elitism(n=int(population_size *
