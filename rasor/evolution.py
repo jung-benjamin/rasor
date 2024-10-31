@@ -13,7 +13,7 @@ from tqdm import tqdm, trange
 
 from .likelihood import GaussianLikelihood, GaussianLikelihoodLookUp
 from .marginals import MarginalsFactory
-from .metrics import MaxLikelihoodUncertainty, MultiMetric
+from .metrics import MultiMetric, SingleMetric
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
 from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
@@ -28,6 +28,8 @@ class Fitness:
                  test_point,
                  uncertainty_kwargs,
                  marginal_kwargs,
+                 score_type='uncertainty',
+                 metric_type='max',
                  num_proc=1):
         self.models = SurrogateCollection.from_ratiolist(**data,
                                                          ratios=gene_pool)
@@ -42,6 +44,9 @@ class Fitness:
             self.num_test_points = 1
         else:
             raise ValueError(f'Invalid test point shape: {test_point.shape}')
+        self.score_type = score_type
+        self.metric_type = metric_type
+        self.num_proc = num_proc
 
     @property
     def logger(self):
@@ -76,8 +81,10 @@ class Fitness:
                 surrogates=[self.models[g] for g in gene],
                 test_point=self.test_point,
                 **self.uncertainty_kwargs)
-            metric = MaxLikelihoodUncertainty(likelihood=likelihood,
-                                              marginals=self.marginals)
+            metric = SingleMetric(likelihood=likelihood,
+                                  marginals=self.marginals,
+                                  score_type=self.score_type,
+                                  metric_type=self.metric_type)
         else:
             likelihoods = [
                 GaussianLikelihood(surrogates=[self.models[g] for g in gene],
@@ -87,7 +94,9 @@ class Fitness:
             ]
             metric = MultiMetric(likelihoods=likelihoods,
                                  marginals=self.marginals,
-                                 num_proc=self.num_proc)
+                                 num_proc=self.num_proc,
+                                 score_type=self.score_type,
+                                 metric_type=self.metric_type)
         return metric()
 
 
@@ -100,6 +109,8 @@ class FitnessLookup(Fitness):
                  test_point,
                  uncertainty_kwargs,
                  marginal_kwargs,
+                 score_type='uncertainty',
+                 metric_type='max',
                  num_proc=1):
         """Initialize the fitness function with lookkup tables.
 
@@ -137,6 +148,9 @@ class FitnessLookup(Fitness):
             self.num_test_points = 1
         else:
             raise ValueError(f'Invalid test point shape: {test_point.shape}')
+        self.test_point = test_point
+        self.score_type = score_type
+        self.metric_type = metric_type
         self.num_proc = num_proc
 
     def __call__(self, gene):
@@ -145,21 +159,27 @@ class FitnessLookup(Fitness):
             likelihood = GaussianLikelihoodLookUp(
                 surrogates=self.surrogate_lookup.get_subset(gene),
                 test_point_mu=self.test_point_lookup.get_subset(gene),
+                test_point=self.test_point,
                 **self.uncertainty_kwargs)
-            metric = MaxLikelihoodUncertainty(likelihood=likelihood,
-                                              marginals=self.marginals)
+            metric = SingleMetric(likelihood=likelihood,
+                                  marginals=self.marginals,
+                                  score_type=self.score_type,
+                                  metric_type=self.metric_type)
         else:
             likelihoods = [
                 GaussianLikelihoodLookUp(
                     surrogates=self.surrogate_lookup.get_subset(gene),
                     test_point_mu=self.test_point_lookup.get_subset(
                         gene).select_idx(i),
+                    test_point=self.test_point[i],
                     **self.uncertainty_kwargs)
                 for i in range(self.num_test_points)
             ]
             metric = MultiMetric(likelihoods=likelihoods,
                                  marginals=self.marginals,
-                                 num_proc=self.num_proc)
+                                 num_proc=self.num_proc,
+                                 score_type=self.score_type,
+                                 metric_type=self.metric_type)
         return metric()
 
 
@@ -377,6 +397,7 @@ class GalapagosIslands:
                  data,
                  uncertainty_kwargs,
                  marginal_kwargs,
+                 metric_kwargs,
                  init_size=100,
                  init_length=10,
                  max_iter=20,
@@ -398,6 +419,7 @@ class GalapagosIslands:
         self.data = data
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginal_kwargs = marginal_kwargs
+        self.metric_kwargs = metric_kwargs
         self.max_iter = max_iter
         self.use_lookup = use_lookup
         self.use_combined = use_combined
@@ -449,7 +471,8 @@ class GalapagosIslands:
             'marginal_kwargs': self.marginal_kwargs,
             'uncertainty_kwargs': self.uncertainty_kwargs,
             'test_point': self.test_points,
-            'num_proc': num_proc
+            'num_proc': num_proc,
+            **self.metric_kwargs
         }
         evo_kws = {
             'gene_pool': self.gene_pool,
@@ -473,7 +496,8 @@ class GalapagosIslands:
                 'data': self.data,
                 'marginal_kwargs': self.marginal_kwargs,
                 'uncertainty_kwargs': self.uncertainty_kwargs,
-                'test_point': tp
+                'test_point': tp,
+                **self.metric_kwargs
             }
             evo_kws = {
                 'gene_pool': self.gene_pool,
@@ -498,7 +522,8 @@ class GalapagosIslands:
                 'data': self.data,
                 'marginal_kwargs': self.marginal_kwargs,
                 'uncertainty_kwargs': self.uncertainty_kwargs,
-                'test_point': tp
+                'test_point': tp,
+                **self.metric_kwargs
             }, {
                 'gene_pool': self.gene_pool,
                 'mutations': self.mutations,
