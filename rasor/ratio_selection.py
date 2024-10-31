@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+import time
 from json import JSONEncoder
 from pathlib import Path
 
@@ -113,6 +114,7 @@ def store_results(selected, metric_vals, output_dir):
 
 def run_ratio_selection(args):
     """Run isotope ratio selection."""
+    tick = time.perf_counter()
     algorithm = parse_input_file(args.infile)
     selected, metric = select_ratios(algorithm=algorithm,
                                      ncores=args.cores,
@@ -124,6 +126,8 @@ def run_ratio_selection(args):
         store_results(selected=selected,
                       metric_vals=metric,
                       output_dir=args.output)
+    tock = time.perf_counter()
+    logging.info(f'Finished in {tock - tick} seconds.')
 
 
 def config_logging(loglevel='INFO',
