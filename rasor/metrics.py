@@ -203,13 +203,30 @@ class SingleMetric(Metric):
                  metric_type='max',
                  score_type='uncertainty'):
         """Set the likelihoods and the metric type."""
-        self.likelihoods = likelihood
+        self.likelihood = likelihood
         self.marginals = marginals
         self.metric_func = self._metric_types[metric_type](
             likelihood=likelihood, marginals=marginals, score_type=score_type)
 
     def _metric_function(self):
         return self.metric_func()
+
+    @classmethod
+    def from_dict(cls, d):
+        """Instantiate class from dictionary."""
+        m_fac = MarginalsFactory()
+        m_dict = d['Marginals'].copy()
+        m_dict['limits'] = np.array(d['Metric'].get('limits',
+                                                    d['Problem']['limits']))
+        marginals = m_fac.get_marginals(**m_dict)
+        l_dict = d['Likelihood'].copy()
+        models = SurrogateCollection.from_ratiolist(
+            **l_dict['surrogates'],
+            ratios=d['Problem']['ratios'],
+        )
+        likelihood = GaussianLikelihood(surrogates=models.modellist(),
+                                        **l_dict['uncertainty'])
+        return cls(likelihood=likelihood, marginals=marginals, **d['Metric'])
 
 
 class MultiMetric(Metric):
