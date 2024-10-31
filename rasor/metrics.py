@@ -189,6 +189,29 @@ def caller(f):
     return f()
 
 
+class SingleMetric(Metric):
+    """Calculate a metric for a single test point."""
+
+    _metric_types = {
+        'max': MaxScore,
+        'sum': SquaredSumScore,
+    }
+
+    def __init__(self,
+                 likelihood,
+                 marginals,
+                 metric_type='max',
+                 score_type='uncertainty'):
+        """Set the likelihoods and the metric type."""
+        self.likelihoods = likelihood
+        self.marginals = marginals
+        self.metric_func = self._metric_types[metric_type](
+            likelihood=likelihood, marginals=marginals, score_type=score_type)
+
+    def _metric_function(self):
+        return self.metric_func()
+
+
 class MultiMetric(Metric):
 
     _metric_types = {
