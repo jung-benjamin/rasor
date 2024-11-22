@@ -53,11 +53,16 @@ def get_metric(ratios, param_dict):
     return SingleMetric.from_dict(param_dict)
 
 
-def evaluate_solubility_matrix(ratios, test_points, metric_params):
+def evaluate_solubility_matrix(ratios,
+                               test_points,
+                               metric_params,
+                               use_combined=False):
     """Create and fill the solubility matrix"""
     metric = get_metric(ratios, metric_params)
     solu = SolubilityMatrix(metric=metric, test_points=test_points)
     solu.fill()
+    if use_combined:
+        return np.mean(solu.matrix)
     return solu.matrix
 
 
@@ -66,10 +71,11 @@ class Minotaur:
 
     combo_length = 2
 
-    def __init__(self, ratios, test_points, metric_params):
+    def __init__(self, ratios, test_points, metric_params, use_combined=False):
         self.ratios = ratios
         self.test_points = test_points
         self.metric_params = metric_params
+        self.use_combined = use_combined
 
     def combinations(self):
         """Iterator over all combinations of ratios."""
@@ -86,12 +92,14 @@ class Minotaur:
             matrices[','.join(r)] = evaluate_solubility_matrix(
                 ratios=r,
                 test_points=self.test_points,
-                metric_params=self.metric_params)
+                metric_params=self.metric_params,
+                use_combined=self.use_combined)
         return list(matrices.keys()), list(matrices.values())
 
     def _scan_multiproc(self, num_proc):
         args = {
-            ','.join(c): (c, self.test_points, self.metric_params)
+            ','.join(c):
+            (c, self.test_points, self.metric_params, self.use_combined)
             for c in self.combinations()
         }
         with Pool(processes=num_proc) as pool:
