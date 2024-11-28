@@ -35,7 +35,7 @@ class Fitness:
         self.models = SurrogateCollection.from_ratiolist(**data,
                                                          ratios=gene_pool)
         self.test_point = test_point
-        self.logger.info(f'Setting test point: {test_point}')
+        self.logger.debug(f'Setting test point: {test_point}')
         self.uncertainty_kwargs = uncertainty_kwargs
         self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
         self.marginals.create_samples()
@@ -135,7 +135,7 @@ class FitnessLookup(Fitness):
 
         self.models = SurrogateCollection.from_ratiolist(**data,
                                                          ratios=gene_pool)
-        self.logger.info(f'Setting test points: {test_point}')
+        self.logger.debug(f'Setting test points: {test_point}')
         self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
         self.marginals.create_samples()
         self.uncertainty_kwargs = uncertainty_kwargs
@@ -264,15 +264,16 @@ class Evolution:
         log.setLevel(getattr(logging, loglevel.upper()))
         log.handlers.clear()
         fmt = logging.Formatter(formatstr)
-        sh = logging.StreamHandler()
-        sh.setLevel(getattr(logging, loglevel.upper()))
-        sh.setFormatter(fmt)
-        log.addHandler(sh)
         if logpath:
             fh = logging.FileHandler(logpath)
             fh.setLevel(getattr(logging, loglevel.upper()))
             fh.setFormatter(fmt)
             log.addHandler(fh)
+        else:
+            sh = logging.StreamHandler()
+            sh.setLevel(getattr(logging, loglevel.upper()))
+            sh.setFormatter(fmt)
+            log.addHandler(sh)
 
     def _set_initial_population(self):
         """Create the inital population of genes."""
@@ -369,7 +370,7 @@ class Evolution:
         between the specified fraction and the initial size is filled
         with novelty search.
         """
-        self.logger.info(f'Current population: {self.population}')
+        self.logger.debug(f'Current population: {self.population}')
         population_size = self.init_size
         new_population = []
         elites = self.elitism(n=int(population_size *
@@ -489,15 +490,16 @@ class GalapagosIslands:
         log.setLevel(getattr(logging, loglevel.upper()))
         log.handlers.clear()
         fmt = logging.Formatter(formatstr)
-        sh = logging.StreamHandler()
-        sh.setLevel(getattr(logging, loglevel.upper()))
-        sh.setFormatter(fmt)
-        log.addHandler(sh)
         if logpath:
             fh = logging.FileHandler(logpath)
             fh.setLevel(getattr(logging, loglevel.upper()))
             fh.setFormatter(fmt)
             log.addHandler(fh)
+        else:
+            sh = logging.StreamHandler()
+            sh.setLevel(getattr(logging, loglevel.upper()))
+            sh.setFormatter(fmt)
+            log.addHandler(sh)
 
     def _combine(self, num_proc=1):
         """Run evolution with combined test points.

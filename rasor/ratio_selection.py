@@ -145,15 +145,16 @@ def config_logging(loglevel='INFO',
     log.setLevel(getattr(logging, loglevel.upper()))
     log.handlers.clear()
     fmt = logging.Formatter(formatstr)
-    sh = logging.StreamHandler()
-    sh.setLevel(getattr(logging, loglevel.upper()))
-    sh.setFormatter(fmt)
-    log.addHandler(sh)
     if logpath:
         fh = logging.FileHandler(logpath)
         fh.setLevel(getattr(logging, loglevel.upper()))
         fh.setFormatter(fmt)
         log.addHandler(fh)
+    else:
+        sh = logging.StreamHandler()
+        sh.setLevel(getattr(logging, loglevel.upper()))
+        sh.setFormatter(fmt)
+        log.addHandler(sh)
 
 
 if __name__ == '__main__':
