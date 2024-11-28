@@ -79,7 +79,9 @@ def parse_input_file(infile):
     elif algorithm == 'brute_force':
         battering_ram = Minotaur(ratios=ratios,
                                  test_points=test_points,
-                                 metric_params=arg_dict)
+                                 metric_params=arg_dict,
+                                 use_combined=algorithm_kws.get(
+                                     'use_combined', False))
         if algorithm_kws.get(algorithm):
             Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return battering_ram
