@@ -9,6 +9,7 @@ from itertools import chain
 from multiprocessing import Pool
 
 import numpy as np
+from mpi4py import MPI
 from tqdm import tqdm, trange
 
 from .likelihood import GaussianLikelihood, GaussianLikelihoodLookUp
@@ -183,6 +184,24 @@ class FitnessLookup(Fitness):
         return metric()
 
 
+def split_into_chunks(lst, n):
+    """Split a list into n equal chunks."""
+    # Calculate the size of each chunk
+    avg_chunk_size = len(lst) // n
+    remainder = len(lst) % n
+
+    chunks = []
+    start_index = 0
+
+    for i in range(n):
+        # Determine the end index for this chunk
+        end_index = start_index + avg_chunk_size + (1 if i < remainder else 0)
+        chunks.append(lst[start_index:end_index])
+        start_index = end_index
+
+    return chunks
+
+
 class Evolution:
     """Genetic evolution overlord class."""
 
@@ -271,7 +290,28 @@ class Evolution:
 
     def evaluate_fitness(self):
         """Evaluate the fitness function for each gene in the population."""
-        fitness = [self.fitness_func(gene) for gene in self.population]
+        comm = MPI.COMM_WORLD
+        size = comm.Get_size()
+        if size > 1:
+            # if False:
+            rank = comm.Get_rank()
+            # if rank == 0:
+            #     # chunks = np.array_split(self.population, size)
+            #     chunks = split_into_chunks(self.population, size)
+            # else:
+            #     chunks = None
+            # chunk = comm.scatter(chunks, root=0)
+            chunks = split_into_chunks(self.population, size)
+            fit = [self.fitness_func(gene) for gene in chunks[rank]]
+            fit = comm.gather(fit, root=0)
+            if rank == 0:
+                # fitness = np.concatenate(fit)
+                fitness = list(chain(*fit))
+            else:
+                fitness = None
+            fitness = comm.bcast(fitness, root=0)
+        else:
+            fitness = [self.fitness_func(gene) for gene in self.population]
         self.fitness = fitness
 
     def best_fitness_idx(self, n=5, cutoff=1e-4):

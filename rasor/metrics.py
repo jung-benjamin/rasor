@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from multiprocessing import Pool
 
 import numpy as np
-from mpi4py import MPI
 
 from .likelihood import GaussianLikelihood
 from .marginals import MarginalsFactory
@@ -217,35 +216,7 @@ class MultiMetric(Metric):
 
     def _metric_function(self):
 
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        if size > 1:
-            if rank == 0:
-                # split the list of likelihoods in size parts
-                # and send each part to a different process
-                chunks = np.array_split(self.likelihoods, size)
-            else:
-                chunks = None
-            # scatter the chunks to all processes
-            chunk = comm.scatter(chunks, root=0)
-            mlu = [
-                self.metric_func(likelihood=ll,
-                                 marginals=self.marginals,
-                                 score_type=self.score_type)() for ll in chunk
-            ]
-            # gather the results from all processes
-            mlu = comm.gather(mlu, root=0)
-            if rank == 0:
-                mlu_all = []
-                for m in mlu:
-                    mlu_all.extend(m)
-                metr = np.mean(mlu_all)
-            else:
-                metr = None
-            metr = comm.bcast(metr, root=0)
-            return metr
-        elif self.num_proc > 1:
+        if self.num_proc > 1:
             with Pool(self.num_proc) as p:
                 mlu = [
                     self.metric_func(likelihood=ll,
