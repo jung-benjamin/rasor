@@ -4,6 +4,7 @@
 import json
 import logging
 import multiprocessing as mp
+from collections.abc import Iterable
 from functools import reduce
 from itertools import chain
 from multiprocessing import Pool
@@ -595,6 +596,15 @@ class GalapagosIslands:
         return best_genes, fitness_evolution
 
 
+def flatten(xs):
+    """Flatten an arbitrarily nested list."""
+    for x in xs:
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            yield from flatten(x)
+        else:
+            yield x
+
+
 class GeneSequencer:
     """Find unique set of ratios from the evolution results."""
 
@@ -603,7 +613,7 @@ class GeneSequencer:
 
     def find_unique(self):
         """Find unique set of genes."""
-        unique_genes = set(chain(*chain.from_iterable(self.best_genes)))
+        unique_genes = set(flatten(self.best_genes))
         return sorted(unique_genes)
 
     @classmethod
