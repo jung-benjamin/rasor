@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 """Provide access to functions via scripts."""
 
+from . import plot_genetic_evolution as pge
 from . import post_processing as pp
 from . import pre_selection as ps
 from . import ratio_selection as rs
@@ -22,3 +23,8 @@ def run_post_processing():
     """Run post processing algorithm."""
     args = pp.argparser()
     pp.run_post_processing(args)
+
+
+def plot_genetic_evolution():
+    """Plot genetic algorithm evolution."""
+    pge.plot(pge.argparser())
