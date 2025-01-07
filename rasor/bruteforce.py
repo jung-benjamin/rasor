@@ -224,14 +224,27 @@ class Aftermath:
         self.keys = np.array(keys)
         self.matrix = np.array(solubility)
 
-    def find_best_ratios(self, depth=10):
-        """Find best ratio set for each grid point."""
-        if len(self.matrix.shape) > 1:
-            min_idx = self.matrix.argmin(axis=0)
-            return self.keys[sorted(set(min_idx))]
-        else:
-            sort_idx = self.matrix.argsort()
-            return self.keys[sort_idx[:depth]]
+    def find_best_ratios(self, depth=1):
+        """Find best ratio set for each grid point.
+        
+        Finds the ratio set with the lowest metric value(s) for
+        each grid point in the solubility matrix. Filters duplicate
+        sets of ratios and sorts the results alphabetically (not by
+        metric value!!!).
+
+        Parameters
+        ----------
+        depth : int
+            Number of best ratios to return for each grid point in the
+            solubility matrix.
+
+        Returns
+        -------
+        np.ndarray
+            Array of ratio sets with the lowest metric values
+        """
+        sort_idx = self.matrix.argsort(axis=0)[:depth]
+        return self.keys[sorted(set(sort_idx.flatten()))]
 
 
 class LootCollector:

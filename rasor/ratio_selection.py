@@ -75,7 +75,7 @@ def parse_input_file(infile):
             metric_kwargs=arg_dict['Metric'],
             uncertainty_kwargs=arg_dict['Likelihood']['uncertainty'],
             **algorithm_kws[algorithm])
-        return islands
+        return {'algorithm': islands}
     elif algorithm == 'brute_force':
         battering_ram = Minotaur(
             ratios=ratios,
@@ -85,21 +85,24 @@ def parse_input_file(infile):
             use_lookup=algorithm_kws[algorithm].get('use_lookup', False))
         if algorithm_kws.get(algorithm):
             Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
-        return battering_ram
+        return {
+            'algorithm': battering_ram,
+            'depth': algorithm_kws[algorithm].get('depth', 1)
+        }
     elif algorithm == 'baby_brute':
         with open(algorithm_kws[algorithm].get('combination_file'), 'r') as f:
             combinations = json.load(f)
         baby = BabyMinotaur(combinations=combinations,
                             test_points=test_points,
                             metric_params=arg_dict)
-        return baby
+        return {'algorithm': baby}
 
 
-def select_ratios(algorithm, ncores=1, log_kwargs=None):
+def select_ratios(algorithm, ncores=1, log_kwargs=None, **kwargs):
     """Use the algorithm to select isotopic ratios."""
     if isinstance(algorithm, Minotaur):
         afterwards = Aftermath(*algorithm.fight(num_proc=ncores))
-        selected = afterwards.find_best_ratios()
+        selected = afterwards.find_best_ratios(depth=kwargs.get('depth', 1))
         metric_vals = dict(zip(afterwards.keys, afterwards.matrix))
     elif isinstance(algorithm, GalapagosIslands):
         selected, metric_vals = algorithm.speciate(num_proc=ncores,
@@ -121,7 +124,7 @@ def run_ratio_selection(args):
     """Run isotope ratio selection."""
     tick = time.perf_counter()
     algorithm = parse_input_file(args.infile)
-    selected, metric = select_ratios(algorithm=algorithm,
+    selected, metric = select_ratios(**algorithm,
                                      ncores=args.cores,
                                      log_kwargs={
                                          'loglevel': args.log_level,
