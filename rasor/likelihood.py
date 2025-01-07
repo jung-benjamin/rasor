@@ -59,6 +59,7 @@ class LikelihoodModel(ABC):
             self.test_point = test_point
         else:
             self._test_point = test_point
+        self._mu = None
 
     @property
     def test_point(self):
@@ -71,6 +72,16 @@ class LikelihoodModel(ABC):
         self._test_point = tp
         self.calc_mu()
         self.calc_sigma()
+
+    @property
+    def mu(self):
+        """Mean of the surrogate evaluations."""
+        return self._mu
+
+    @mu.setter
+    def mu(self, mu):
+        """Set the mean of the surrogate evaluations."""
+        self._mu = mu
 
     def calc_mu(self):
         """Evaluate the surrogates on the test point."""
@@ -136,15 +147,23 @@ class LikelihoodLookUp(LikelihoodModel):
             prob *= self.pdf(func, mu, sigma)
         return prob
 
-    @property
-    def test_point(self):
-        """Test point(s) on which likelihood is conditional."""
-        return self._test_point
-
-    @test_point.setter
+    @LikelihoodModel.test_point.setter
     def test_point(self, tp):
         """Set a test point."""
         self._test_point = tp
+
+    @LikelihoodModel.mu.setter
+    def mu(self, mu):
+        """Set the mean of the surrogate evaluations."""
+        if isinstance(mu, np.ndarray):
+            self._mu = mu
+        elif isinstance(mu, list):
+            self._mu = np.array(mu)
+        elif isinstance(mu, dict):
+            self._mu = np.array(list(mu.values()))
+        else:
+            raise ValueError(
+                f"mu must be list, np.ndarray, or dict, not {type(mu)}")
 
 
 class GaussianLikelihood(LikelihoodModel):
