@@ -77,11 +77,12 @@ def parse_input_file(infile):
             **algorithm_kws[algorithm])
         return islands
     elif algorithm == 'brute_force':
-        battering_ram = Minotaur(ratios=ratios,
-                                 test_points=test_points,
-                                 metric_params=arg_dict,
-                                 use_combined=algorithm_kws.get(
-                                     'use_combined', False))
+        battering_ram = Minotaur(
+            ratios=ratios,
+            test_points=test_points,
+            metric_params=arg_dict,
+            use_combined=algorithm_kws[algorithm].get('use_combined', False),
+            use_lookup=algorithm_kws[algorithm].get('use_lookup', False))
         if algorithm_kws.get(algorithm):
             Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return battering_ram
