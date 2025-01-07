@@ -8,8 +8,11 @@ from multiprocessing import Pool
 import numpy as np
 from tqdm import tqdm
 
+from .likelihood import GaussianLikelihoodLookUp
+from .marginals import MarginalsFactory
 from .metrics import SingleMetric
 from .sampling import SamplerFactory
+from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
 
 
 class SolubilityMatrix:
@@ -34,12 +37,22 @@ class SolubilityMatrix:
         self.sampler = SamplerFactory().get_sampler(**kwarg_dict)
         self.set_test_points(self.sampler())
 
-    def fill(self):
+    def fill(self, test_point_lookup=None):
         """Evaluate the metric on each test_point."""
         self.matrix = np.empty(self.test_points.shape[0])
-        for i, tp in enumerate(self.test_points):
-            self.metric.likelihood.test_point = tp
-            self.matrix[i] = self.metric()
+        if test_point_lookup:
+            # tp_array = np.array(list(test_point_lookup.values())).T
+            # for i, tp in enumerate(test_point_lookup.values()):
+            for i in range(self.test_points.shape[0]):
+                # for i, tp in enumerate(tp_array):
+                self.metric.likelihood.mu = test_point_lookup.select_idx(i)
+                # self.metric.likelihood.mu = tp
+                self.metric.likelihood.calc_sigma()
+                self.matrix[i] = self.metric()
+        else:
+            for i, tp in enumerate(self.test_points):
+                self.metric.likelihood.test_point = tp
+                self.matrix[i] = self.metric()
 
     @classmethod
     def from_dict(cls, d):
@@ -56,11 +69,27 @@ def get_metric(ratios, param_dict):
 def evaluate_solubility_matrix(ratios,
                                test_points,
                                metric_params,
-                               use_combined=False):
+                               use_combined=False,
+                               surrogate_lookup=None,
+                               test_point_lookup=None,
+                               marginals=None):
     """Create and fill the solubility matrix"""
-    metric = get_metric(ratios, metric_params)
+    if surrogate_lookup:
+        likelihood = GaussianLikelihoodLookUp(
+            surrogates=surrogate_lookup,
+            test_point_mu=test_point_lookup,
+            test_point=test_points,
+            **metric_params["Likelihood"]['uncertainty'])
+        metric = SingleMetric(likelihood=likelihood,
+                              marginals=marginals,
+                              **metric_params['Metric'])
+    else:
+        metric = get_metric(ratios, metric_params)
     solu = SolubilityMatrix(metric=metric, test_points=test_points)
-    solu.fill()
+    if surrogate_lookup:
+        solu.fill(test_point_lookup=test_point_lookup)
+    else:
+        solu.fill()
     if use_combined:
         return np.mean(solu.matrix)
     return solu.matrix
@@ -71,11 +100,46 @@ class Minotaur:
 
     combo_length = 2
 
-    def __init__(self, ratios, test_points, metric_params, use_combined=False):
+    def __init__(self,
+                 ratios,
+                 test_points,
+                 metric_params,
+                 use_combined=False,
+                 use_lookup=False):
         self.ratios = ratios
-        self.test_points = test_points
+        test_point_dispatcher = {
+            np.ndarray: self.set_test_points,
+            dict: self.sample_test_points
+        }
+        t = type(test_points)
+        test_point_dispatcher[t](test_points)
         self.metric_params = metric_params
         self.use_combined = use_combined
+        self.use_lookup = use_lookup
+        # if self.use_lookup:
+        #     print(f'Using lookup tables...')
+        #     m_fac = MarginalsFactory()
+        #     m_dict = self.metric_params['Marginals'].copy()
+        #     m_dict['limits'] = np.array(self.metric_params['Metric'].get(
+        #         'limits', self.metric_params['Problem']['limits']))
+        #     self.marginals = m_fac.get_marginals(**m_dict)
+        #     self.marginals.create_samples()
+        #     self.models = SurrogateCollection.from_ratiolist(
+        #         **self.metric_params["Likelihood"]["surrogates"],
+        #         ratios=self.ratios)
+        #     self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+        #         self.models, self.marginals.samples)
+        #     self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+        #         self.models, self.test_points)
+
+    def set_test_points(self, tp):
+        """Set the test point array."""
+        self.test_points = tp
+
+    def sample_test_points(self, kwarg_dict):
+        """Create a sampler and create the test point array."""
+        self.sampler = SamplerFactory().get_sampler(**kwarg_dict)
+        self.set_test_points(self.sampler())
 
     def combinations(self):
         """Iterator over all combinations of ratios."""
@@ -88,12 +152,37 @@ class Minotaur:
 
     def _scan(self):
         matrices = {}
-        for r in tqdm(self.combinations(), disable=None):
-            matrices[','.join(r)] = evaluate_solubility_matrix(
-                ratios=r,
-                test_points=self.test_points,
-                metric_params=self.metric_params,
-                use_combined=self.use_combined)
+        if self.use_lookup:
+            print(f'Using lookup tables...')
+            m_fac = MarginalsFactory()
+            m_dict = self.metric_params['Marginals'].copy()
+            m_dict['limits'] = np.array(self.metric_params['Metric'].get(
+                'limits', self.metric_params['Problem']['limits']))
+            self.marginals = m_fac.get_marginals(**m_dict)
+            self.marginals.create_samples()
+            self.models = SurrogateCollection.from_ratiolist(
+                **self.metric_params["Likelihood"]["surrogates"],
+                ratios=self.ratios)
+            self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+                self.models, self.marginals.samples)
+            self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+                self.models, self.test_points)
+            for r in tqdm(self.combinations(), disable=None):
+                matrices[','.join(r)] = evaluate_solubility_matrix(
+                    ratios=r,
+                    test_points=self.test_points,
+                    metric_params=self.metric_params,
+                    use_combined=self.use_combined,
+                    surrogate_lookup=self.surrogate_lookup.get_subset(r),
+                    test_point_lookup=self.test_point_lookup.get_subset(r),
+                    marginals=self.marginals)
+        else:
+            for r in tqdm(self.combinations(), disable=None):
+                matrices[','.join(r)] = evaluate_solubility_matrix(
+                    ratios=r,
+                    test_points=self.test_points,
+                    metric_params=self.metric_params,
+                    use_combined=self.use_combined)
         return list(matrices.keys()), list(matrices.values())
 
     def _scan_multiproc(self, num_proc):
@@ -144,10 +233,14 @@ class Aftermath:
         self.keys = np.array(keys)
         self.matrix = np.array(solubility)
 
-    def find_best_ratios(self):
+    def find_best_ratios(self, depth=10):
         """Find best ratio set for each grid point."""
-        min_idx = self.matrix.argmin(axis=0)
-        return self.keys[sorted(set(min_idx))]
+        if len(self.matrix.shape) > 1:
+            min_idx = self.matrix.argmin(axis=0)
+            return self.keys[sorted(set(min_idx))]
+        else:
+            sort_idx = self.matrix.argsort()
+            return self.keys[sort_idx[:depth]]
 
 
 class LootCollector:
