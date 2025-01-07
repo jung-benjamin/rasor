@@ -41,12 +41,8 @@ class SolubilityMatrix:
         """Evaluate the metric on each test_point."""
         self.matrix = np.empty(self.test_points.shape[0])
         if test_point_lookup:
-            # tp_array = np.array(list(test_point_lookup.values())).T
-            # for i, tp in enumerate(test_point_lookup.values()):
             for i in range(self.test_points.shape[0]):
-                # for i, tp in enumerate(tp_array):
                 self.metric.likelihood.mu = test_point_lookup.select_idx(i)
-                # self.metric.likelihood.mu = tp
                 self.metric.likelihood.calc_sigma()
                 self.matrix[i] = self.metric()
         else:
@@ -116,21 +112,21 @@ class Minotaur:
         self.metric_params = metric_params
         self.use_combined = use_combined
         self.use_lookup = use_lookup
-        # if self.use_lookup:
-        #     print(f'Using lookup tables...')
-        #     m_fac = MarginalsFactory()
-        #     m_dict = self.metric_params['Marginals'].copy()
-        #     m_dict['limits'] = np.array(self.metric_params['Metric'].get(
-        #         'limits', self.metric_params['Problem']['limits']))
-        #     self.marginals = m_fac.get_marginals(**m_dict)
-        #     self.marginals.create_samples()
-        #     self.models = SurrogateCollection.from_ratiolist(
-        #         **self.metric_params["Likelihood"]["surrogates"],
-        #         ratios=self.ratios)
-        #     self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
-        #         self.models, self.marginals.samples)
-        #     self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
-        #         self.models, self.test_points)
+        if self.use_lookup:
+            print(f'Using lookup tables...')
+            m_fac = MarginalsFactory()
+            m_dict = self.metric_params['Marginals'].copy()
+            m_dict['limits'] = np.array(self.metric_params['Metric'].get(
+                'limits', self.metric_params['Problem']['limits']))
+            self.marginals = m_fac.get_marginals(**m_dict)
+            self.marginals.create_samples()
+            self.models = SurrogateCollection.from_ratiolist(
+                **self.metric_params["Likelihood"]["surrogates"],
+                ratios=self.ratios)
+            self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+                self.models, self.marginals.samples)
+            self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
+                self.models, self.test_points)
 
     def set_test_points(self, tp):
         """Set the test point array."""
@@ -153,20 +149,6 @@ class Minotaur:
     def _scan(self):
         matrices = {}
         if self.use_lookup:
-            print(f'Using lookup tables...')
-            m_fac = MarginalsFactory()
-            m_dict = self.metric_params['Marginals'].copy()
-            m_dict['limits'] = np.array(self.metric_params['Metric'].get(
-                'limits', self.metric_params['Problem']['limits']))
-            self.marginals = m_fac.get_marginals(**m_dict)
-            self.marginals.create_samples()
-            self.models = SurrogateCollection.from_ratiolist(
-                **self.metric_params["Likelihood"]["surrogates"],
-                ratios=self.ratios)
-            self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
-                self.models, self.marginals.samples)
-            self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
-                self.models, self.test_points)
             for r in tqdm(self.combinations(), disable=None):
                 matrices[','.join(r)] = evaluate_solubility_matrix(
                     ratios=r,
@@ -186,11 +168,20 @@ class Minotaur:
         return list(matrices.keys()), list(matrices.values())
 
     def _scan_multiproc(self, num_proc):
-        args = {
-            ','.join(c):
-            (c, self.test_points, self.metric_params, self.use_combined)
-            for c in self.combinations()
-        }
+        if self.use_lookup:
+            args = {
+                ','.join(c):
+                (c, self.test_points, self.metric_params, self.use_combined,
+                 self.surrogate_lookup.get_subset(c),
+                 self.test_point_lookup.get_subset(c), self.marginals)
+                for c in self.combinations()
+            }
+        else:
+            args = {
+                ','.join(c):
+                (c, self.test_points, self.metric_params, self.use_combined)
+                for c in self.combinations()
+            }
         with Pool(processes=num_proc) as pool:
             matrices = pool.starmap(evaluate_solubility_matrix,
                                     list(args.values()))
