@@ -10,6 +10,7 @@ from itertools import chain
 from multiprocessing import Pool
 
 import numpy as np
+import psutil
 from mpi4py import MPI
 from tqdm import tqdm, trange
 
@@ -294,6 +295,9 @@ class Evolution:
         """Evaluate the fitness function for each gene in the population."""
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
+        rss = psutil.Process().memory_info().rss
+        rss_msg = f"Memory on {comm.Get_rank()}: {rss / (1024**2):.3f} MB"
+        self.logger.debug(rss_msg)
         if size > 1:
             # if False:
             rank = comm.Get_rank()
