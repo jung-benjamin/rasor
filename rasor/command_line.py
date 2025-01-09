@@ -28,3 +28,8 @@ def run_post_processing():
 def plot_genetic_evolution():
     """Plot genetic algorithm evolution."""
     pge.plot(pge.argparser())
+
+
+def run_aftermath():
+    """Run the aftermath."""
+    rs.just_aftermath()

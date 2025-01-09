@@ -110,6 +110,27 @@ def select_ratios(algorithm, ncores=1, log_kwargs=None, **kwargs):
     return selected, metric_vals
 
 
+def just_aftermath():
+    """Run only the aftermath step, given a JSON file."""
+
+    def argparser():
+        """Parse command line arguments."""
+        parser = argparse.ArgumentParser()
+        metric_file = "JSON file with the metric values."
+        parser.add_argument("metric_file", help=metric_file)
+        depth = "Depth of the search for best ratios."
+        parser.add_argument("-d", "--depth", help=depth, type=int, default=1)
+        output_file = "Output file for best ratios."
+        parser.add_argument("-o", "--output", help=output_file, type=Path)
+        return parser.parse_args()
+
+    args = argparser()
+    aftermath = Aftermath.from_json(args.metric_file)
+    best_ratios = aftermath.find_best_ratios(depth=args.depth)
+    with open(args.output, 'w') as f:
+        json.dump(best_ratios, f, indent=True, cls=NumpyArrayEncoder)
+
+
 def store_results(selected, metric_vals, output_dir):
     """Store selected ratios and the metric to json files."""
     if not output_dir.exists():

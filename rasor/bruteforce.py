@@ -224,6 +224,13 @@ class Aftermath:
         self.keys = np.array(keys)
         self.matrix = np.array(solubility)
 
+    @classmethod
+    def from_json(cls, fp):
+        """Construct class from parameters in a JSON dictionary"""
+        with open(fp, 'r') as f:
+            d = json.load(f)
+        return cls(keys=list(d.keys()), solubility=list(d.values()))
+
     def find_best_ratios(self, depth=1):
         """Find best ratio set for each grid point.
         
