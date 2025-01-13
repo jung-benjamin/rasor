@@ -43,6 +43,7 @@ class SolubilityMatrix:
         if test_point_lookup:
             for i in range(self.test_points.shape[0]):
                 self.metric.likelihood.mu = test_point_lookup.select_idx(i)
+                self.metric.likelihood.test_point = self.test_points[i]
                 self.metric.likelihood.calc_sigma()
                 self.matrix[i] = self.metric()
         else:
