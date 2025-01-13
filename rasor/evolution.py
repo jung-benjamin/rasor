@@ -239,16 +239,30 @@ class Evolution:
                 for m in mutations
             }
         elif isinstance(mutations, dict):
-            self.mutations = {
-                m:
-                MutationFactory().get_mutation(m,
-                                               population_size=self.init_size,
-                                               gene_length=self.init_length,
-                                               rng=self.rng,
-                                               gene_pool=self.gene_pool,
-                                               frequency=freq)
-                for m, freq in mutations.items()
-            }
+            try:
+                self.mutations = {
+                    m:
+                    MutationFactory().get_mutation(
+                        m,
+                        population_size=self.init_size,
+                        gene_length=self.init_length,
+                        rng=self.rng,
+                        gene_pool=self.gene_pool,
+                        **it)
+                    for m, it in mutations.items()
+                }
+            except TypeError:
+                self.mutations = {
+                    m:
+                    MutationFactory().get_mutation(
+                        m,
+                        population_size=self.init_size,
+                        gene_length=self.init_length,
+                        rng=self.rng,
+                        gene_pool=self.gene_pool,
+                        frequency=freq)
+                    for m, freq in mutations.items()
+                }
 
     @property
     def logger(self):

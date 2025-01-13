@@ -94,11 +94,23 @@ class GeneSwap(Mutation):
 
 
 class Addition(Mutation):
-    max_len = 20
+    # max_len = 20
 
-    @classmethod
-    def set_max_len(cls, l):
-        cls.max_len = l
+    # @classmethod
+    # def set_max_len(cls, l):
+    #     cls.max_len = l
+
+    def __init__(self,
+                 population_size,
+                 frequency,
+                 gene_length,
+                 gene_pool,
+                 rng,
+                 max_len=20):
+        """Set parameters for addition mutation."""
+        super().__init__(population_size, frequency, gene_length, gene_pool,
+                         rng)
+        self.max_len = max_len
 
     def _mutate(self, genes):
         n = int(self.population_size * self.frequency / len(genes))
@@ -116,11 +128,23 @@ class Addition(Mutation):
 
 
 class Deletion(Mutation):
-    min_len = 5
+    # min_len = 5
 
-    @classmethod
-    def set_min_len(cls, l):
-        cls.min_len = l
+    # @classmethod
+    # def set_min_len(cls, l):
+    #     cls.min_len = l
+
+    def __init__(self,
+                 population_size,
+                 frequency,
+                 gene_length,
+                 gene_pool,
+                 rng,
+                 min_len=5):
+        """Set parameters for deletion mutation."""
+        super().__init__(population_size, frequency, gene_length, gene_pool,
+                         rng)
+        self.min_len = min_len
 
     def _mutate(self, genes):
         n = int(self.population_size * self.frequency / len(genes))
