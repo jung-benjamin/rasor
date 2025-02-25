@@ -211,7 +211,10 @@ class Evolution:
                  gene_pool,
                  fitness_func,
                  mutations,
+                 random_pool=False,
                  init_length=10,
+                 min_length=5,
+                 max_length=15,
                  init_size=100,
                  rng_seed=1234):
         """Set the gene pool and fitness function parameters."""
@@ -220,6 +223,14 @@ class Evolution:
         self.init_size = init_size
         self.fitness_func = fitness_func
         self.rng = np.random.default_rng(seed=rng_seed)
+        self.draw_params = {"random_pool": random_pool}
+        if random_pool:
+            self.draw_params.update({
+                "min_length": min_length,
+                "max_length": max_length
+            })
+        else:
+            self.draw_params.update({"length": init_length})
         self._set_initial_population()
         self.evaluate_fitness()
         self._set_mutations(mutations=mutations)
@@ -294,13 +305,29 @@ class Evolution:
     def _set_initial_population(self):
         """Create the inital population of genes."""
         self.population = self.draw_from_pool(number=self.init_size,
-                                              length=self.init_length)
+                                              **self.draw_params)
         self.logger.debug(f'Initial population size: {len(self.population)}')
 
-    def draw_from_pool(self, number, length):
+    def draw_from_pool(self, number, random_pool, **kwargs):
+        """Draw genes from the pool."""
+        if random_pool:
+            return self.draw_from_pool_randomly(number=number, **kwargs)
+        else:
+            return self.draw_from_pool_fixed(number=number, **kwargs)
+
+    def draw_from_pool_fixed(self, number, length):
         """Combine genes to form population members."""
         members = [
             self.rng.choice(self.gene_pool, size=length,
+                            replace=False).tolist() for i in range(number)
+        ]
+        return members
+
+    def draw_from_pool_randomly(self, number, min_length, max_length):
+        """Combine genes to form population members."""
+        members = [
+            self.rng.choice(self.gene_pool,
+                            size=self.rng.integers(min_length, max_length),
                             replace=False).tolist() for i in range(number)
         ]
         return members
@@ -404,7 +431,7 @@ class Evolution:
         diff = population_size - len(new_population)
         if diff > 0:
             new_population.extend(
-                self.draw_from_pool(number=diff, length=self.init_length))
+                self.draw_from_pool(number=diff, **self.draw_params))
         self.population = new_population
         self.evaluate_fitness()
 
@@ -460,6 +487,9 @@ class GalapagosIslands:
                  metric_kwargs,
                  init_size=100,
                  init_length=10,
+                 random_pool=False,
+                 min_length=5,
+                 max_length=15,
                  max_iter=20,
                  rng_seed=12345,
                  use_lookup=False,
@@ -475,6 +505,9 @@ class GalapagosIslands:
         self.mutations = mutations
         self.init_size = init_size
         self.init_length = init_length
+        self.random_pool = random_pool
+        self.min_length = min_length
+        self.max_length = max_length
         self.rng_seed = rng_seed
         self.data = data
         self.uncertainty_kwargs = uncertainty_kwargs
@@ -540,7 +573,10 @@ class GalapagosIslands:
             'mutations': self.mutations,
             'init_size': self.init_size,
             'init_length': self.init_length,
-            'rng_seed': self.rng_seed
+            'rng_seed': self.rng_seed,
+            'random_pool': self.random_pool,
+            'min_length': self.min_length,
+            'max_length': self.max_length
         }
         best, fitness = natural_selection(fitness_kws=fit_kws,
                                           evolution_kws=evo_kws,
@@ -565,7 +601,10 @@ class GalapagosIslands:
                 'mutations': self.mutations,
                 'init_size': self.init_size,
                 'init_length': self.init_length,
-                'rng_seed': self.rng_seed
+                'rng_seed': self.rng_seed,
+                'random_pool': self.random_pool,
+                'min_length': self.min_length,
+                'max_length': self.max
             }
             best, fitness = natural_selection(fitness_kws=fit_kws,
                                               evolution_kws=evo_kws,
@@ -590,7 +629,10 @@ class GalapagosIslands:
                 'mutations': self.mutations,
                 'init_size': self.init_size,
                 'init_length': self.init_length,
-                'rng_seed': self.rng_seed
+                'rng_seed': self.rng_seed,
+                'random_pool': self.random_pool,
+                'min_length': self.min_length,
+                'max_length': self.max_length
             }, self.max_iter, log_kwargs, self.use_lookup))
         self.logger.debug(f'Length of multiprocessing args: {len(args)}')
         with Pool(processes=num_proc) as pool:
