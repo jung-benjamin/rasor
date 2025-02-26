@@ -25,15 +25,24 @@ def load_json(fp):
 
 
 def load_metrics(fp):
-    return np.array(load_json(fp))
+    met = load_json(fp)
+    if isinstance(met, dict):
+        return np.array(met["fitness"])
+    elif isinstance(met, list):
+        return np.array(met)
+    else:
+        raise ValueError("Unsupported data format.")
 
 
 def plot_fitness(fitness, save=""):
     """Plot fitness function values."""
     fig, ax = plt.subplots()
     steps = range(fitness.shape[0])
-    for fit in fitness.T:
-        ax.plot(steps, fit)
+    if fitness.shape[1] <= 5:
+        for fit in fitness.T:
+            ax.plot(steps, fit)
+    else:
+        ax.plot(steps, np.nanmean(fitness, axis=1))
     if save:
         plt.savefig(save)
 

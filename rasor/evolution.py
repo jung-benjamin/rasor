@@ -439,10 +439,11 @@ class Evolution:
         self.evaluate_fitness()
 
     def darwinism(self, max_iter=20):
-        fitness_evo = []
+        fitness_evo = {"fitness": [], "population": []}
         for i in trange(max_iter, disable=None):
             self.logger.info(f'Generation {i}')
-            fitness_evo.append(self.best_fitness_vals())
+            fitness_evo["fitness"].append(self.fitness)
+            fitness_evo["population"].append(self.population)
             try:
                 self.evolve()
             except Exception as e:
