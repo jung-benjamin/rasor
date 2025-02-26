@@ -140,7 +140,7 @@ class Minotaur:
 
     def combinations(self):
         """Iterator over all combinations of ratios."""
-        return combinations(self.ratios, r=self.combo_length)
+        return list(combinations(self.ratios, r=self.combo_length))
 
     @classmethod
     def set_combo_length(cls, length):
