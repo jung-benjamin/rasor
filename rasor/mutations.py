@@ -13,6 +13,26 @@ def pool_genes(population):
     return sorted(set(pool))
 
 
+class FixedGeneLength:
+
+    def __init__(self, gene_length):
+        self._gene_length = gene_length
+
+    def __call__(self):
+        return self._gene_length
+
+
+class RandomGeneLength:
+
+    def __init__(self, min_len, max_len, rng):
+        self.min_len = min_len
+        self.max_len = max_len
+        self.rng = rng
+
+    def __call__(self):
+        return self.rng.integers(self.min_len, self.max_len)
+
+
 class Mutation(ABC):
 
     def __init__(self, population_size, frequency, gene_length, gene_pool,
@@ -20,9 +40,22 @@ class Mutation(ABC):
         """Set size of overall population and frequency of mutation."""
         self.population_size = population_size
         self.frequency = frequency
-        self.gene_length = gene_length
         self.gene_pool = gene_pool
         self.rng = rng
+        self._gene_length = gene_length
+
+    @property
+    def gene_length(self):
+        """Get gene length."""
+        return self.calc_gene_length()
+
+    @gene_length.setter
+    def gene_length(self, *args):
+        """Set gene length."""
+        if len(args) == 1:
+            self.calc_gene_length = FixedGeneLength(args[0])
+        elif len(args) == 2:
+            self.calc_gene_length = RandomGeneLength(*args, self.rng)
 
     @property
     def logger(self):

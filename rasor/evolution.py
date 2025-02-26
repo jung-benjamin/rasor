@@ -219,7 +219,10 @@ class Evolution:
                  rng_seed=1234):
         """Set the gene pool and fitness function parameters."""
         self.gene_pool = gene_pool
-        self.init_length = init_length
+        if random_pool:
+            self.init_length = (min_length, max_length)
+        else:
+            self.init_length = init_length
         self.init_size = init_size
         self.fitness_func = fitness_func
         self.rng = np.random.default_rng(seed=rng_seed)
