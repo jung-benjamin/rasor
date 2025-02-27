@@ -2,7 +2,8 @@
 """Select isotopic ratios by evaluating all combinations."""
 
 import json
-from itertools import combinations
+import warnings
+from itertools import chain, combinations
 from multiprocessing import Pool
 
 import numpy as np
@@ -232,7 +233,7 @@ class Aftermath:
             d = json.load(f)
         return cls(keys=list(d.keys()), solubility=list(d.values()))
 
-    def find_best_ratios(self, depth=1):
+    def find_best_ratios(self, depth=1, target_number=None):
         """Find best ratio set for each grid point.
         
         Finds the ratio set with the lowest metric value(s) for
@@ -242,9 +243,13 @@ class Aftermath:
 
         Parameters
         ----------
-        depth : int
+        depth : int, None
             Number of best ratios to return for each grid point in the
-            solubility matrix.
+            solubility matrix. If None, only the target_number limits
+            the number of ratios returned.
+        target_number: int, None
+            Desired length of the final ratio list. If None, only the
+            depth limits the number of ratios returned.
 
         Returns
         -------
@@ -252,13 +257,32 @@ class Aftermath:
             Array of ratio sets with the lowest metric values
         """
         sort_idx = self.matrix.argsort(axis=0)[:depth]
-        return self.keys[sorted(set(sort_idx.flatten()))]
+        if target_number is None:
+            ratios = [p.split(",") for p in self.keys[sort_idx].flatten()]
+            return sorted(set(chain(*ratios)))
+        else:
+            selected = set()
+            for i, idx in enumerate(sort_idx):
+                if len(idx.shape) == 0:
+                    ratios = self.keys[idx].split(",")
+                    if len(selected) < target_number:
+                        selected |= set(ratios)
+                else:
+                    vals = np.array(
+                        [self.matrix[col, j] for j, col in enumerate(idx.T)])
+                    for k in vals.argsort():
+                        ratios = self.keys[idx[k]].split(",")
+                        if len(selected) < target_number:
+                            selected |= set(ratios)
+            return sorted(selected)
 
 
 class LootCollector:
     """Find the unique ratios among the selection of best ratio sets."""
 
     def __init__(self, ratio_keys):
+        msg = "LootCollector is deprecated and will be removed in a future version."
+        warnings.warn(msg, DeprecationWarning)
         self.wreckage = ratio_keys
 
     def find_unique(self):
