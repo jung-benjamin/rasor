@@ -42,20 +42,24 @@ class Mutation(ABC):
         self.frequency = frequency
         self.gene_pool = gene_pool
         self.rng = rng
-        self._gene_length = gene_length
+        if len(gene_length) == 1:
+            self.calc_gene_length = FixedGeneLength(gene_length)
+        else:
+            self.calc_gene_length = RandomGeneLength(*gene_length, rng)
+        # self.gene_length = gene_length
 
     @property
     def gene_length(self):
         """Get gene length."""
         return self.calc_gene_length()
 
-    @gene_length.setter
-    def gene_length(self, *args):
-        """Set gene length."""
-        if len(args) == 1:
-            self.calc_gene_length = FixedGeneLength(args[0])
-        elif len(args) == 2:
-            self.calc_gene_length = RandomGeneLength(*args, self.rng)
+    # @gene_length.setter
+    # def gene_length(self, *args):
+    #     """Set gene length."""
+    #     if len(args) == 1:
+    #         self.calc_gene_length = FixedGeneLength(args[0])
+    #     elif len(args) == 2:
+    #         self.calc_gene_length = RandomGeneLength(*args, self.rng)
 
     @property
     def logger(self):
