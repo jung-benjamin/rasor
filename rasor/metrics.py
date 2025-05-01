@@ -95,6 +95,19 @@ class MarginalMeanDistance(MarginalScore):
             mu - self.likelihood.test_point) / self.likelihood.test_point
 
 
+class MarginalSumNormedDistance(MarginalScore):
+    """Relative distance of marginal mean to the test point.
+    
+    Uses the sum of the mean and the test point as the normalization.
+    """
+
+    def _score(self):
+        """Calculate the metric score."""
+        mu, _ = self._parametrize_marginals()
+        return 2 * np.abs(mu - self.likelihood.test_point) / (
+            mu + self.likelihood.test_point)
+
+
 class CombinedDistanceUncertaintyScore(MarginalScore):
     """Combined score of distance and uncertainty."""
 
@@ -113,6 +126,7 @@ class MarginalScoreFactory:
     score_dispatcher = {
         'uncertainty': MarginalLikelihoodUncertainty,
         'distance': MarginalMeanDistance,
+        'sum_normed': MarginalSumNormedDistance,
         'combined': CombinedDistanceUncertaintyScore
     }
 
