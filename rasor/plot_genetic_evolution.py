@@ -42,7 +42,7 @@ def plot_fitness(fitness, save=""):
         for fit in fitness.T:
             ax.plot(steps, fit)
     else:
-        ax.plot(steps, np.nanmean(fitness, axis=1))
+        ax.plot(steps, np.nanmin(fitness, axis=1))
     if save:
         plt.savefig(save)
 
