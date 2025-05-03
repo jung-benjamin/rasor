@@ -42,9 +42,10 @@ class Mutation(ABC):
         self.frequency = frequency
         self.gene_pool = gene_pool
         self.rng = rng
-        if len(gene_length) == 1:
+        if isinstance(gene_length, int):
             self.calc_gene_length = FixedGeneLength(gene_length)
         else:
+            # Perhaps some error catching/type-checking here?
             self.calc_gene_length = RandomGeneLength(*gene_length, rng)
         # self.gene_length = gene_length
 
