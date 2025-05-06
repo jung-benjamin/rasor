@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 """Metrics for evaluating suitability of a list of ratios."""
+import warnings
 from abc import ABC, abstractmethod
 from multiprocessing import Pool
 
@@ -230,20 +231,22 @@ class MultiMetric(Metric):
 
     def _metric_function(self):
 
+        mlu = [
+            self.metric_func(likelihood=ll,
+                             marginals=self.marginals,
+                             score_type=self.score_type)
+            for ll in self.likelihoods
+        ]
         if self.num_proc > 1:
             with Pool(self.num_proc) as p:
-                mlu = [
-                    self.metric_func(likelihood=ll,
-                                     marginals=self.marginals,
-                                     score_type=self.score_type)
-                    for ll in self.likelihoods
-                ]
-                # args = [(ll, self.marginals) for ll in self.likelihoods]
-                return np.mean(p.map(caller, mlu))
+                # Distribute the metric function calls across processes
+                metric_values = list(p.map(caller, mlu))
         else:
-            return np.mean([
-                self.metric_func(likelihood=ll,
-                                 marginals=self.marginals,
-                                 score_type=self.score_type)()
-                for ll in self.likelihoods
-            ])
+            metric_values = [mf() for mf in mlu]
+        nan_loc = np.where(np.isnan(metric_values))[0]
+        mean = np.nanmean(metric_values)
+        if len(nan_loc) > (0.5 * len(metric_values)):
+            msg = ("Warning: More than 50% of the metric values are NaN.\n" +
+                   f"    The mean metric value is: {mean}")
+            warnings.warn(msg, category=UserWarning)
+        return mean, nan_loc

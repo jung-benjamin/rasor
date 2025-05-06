@@ -4,6 +4,7 @@
 import json
 import logging
 import multiprocessing as mp
+from collections import defaultdict
 from collections.abc import Iterable
 from functools import reduce
 from itertools import chain
@@ -50,6 +51,7 @@ class Fitness:
         self.score_type = score_type
         self.metric_type = metric_type
         self.num_proc = num_proc
+        self.nan_loc_counter = defaultdict(int)
 
     @property
     def logger(self):
@@ -77,6 +79,12 @@ class Fitness:
             fh.setFormatter(fmt)
             log.addHandler(fh)
 
+    def update_nan_loc_counter(self, loc_list):
+        """Update the nan location counter."""
+        for loc in loc_list:
+            self.nan_loc_counter[loc] += 1
+        self.logger.debug(f'NaN location counter: {self.nan_loc_counter}')
+
     def __call__(self, gene):
         """Evaluate the fitness function."""
         if self.num_test_points == 1:
@@ -100,6 +108,10 @@ class Fitness:
                                  num_proc=self.num_proc,
                                  score_type=self.score_type,
                                  metric_type=self.metric_type)
+            val, nan_loc = metric()
+            if nan_loc.any():
+                self.update_nan_loc_counter(nan_loc)
+            return val
         return metric()
 
 
@@ -155,6 +167,7 @@ class FitnessLookup(Fitness):
         self.score_type = score_type
         self.metric_type = metric_type
         self.num_proc = num_proc
+        self.nan_loc_counter = defaultdict(int)
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
@@ -183,6 +196,10 @@ class FitnessLookup(Fitness):
                                  num_proc=self.num_proc,
                                  score_type=self.score_type,
                                  metric_type=self.metric_type)
+            val, nan_loc = metric()
+            if nan_loc.any():
+                self.update_nan_loc_counter(nan_loc)
+            return val
         return metric()
 
 
