@@ -625,7 +625,7 @@ class GalapagosIslands:
                 'rng_seed': self.rng_seed,
                 'random_pool': self.random_pool,
                 'min_length': self.min_length,
-                'max_length': self.max
+                'max_length': self.max_length
             }
             best, fitness = natural_selection(fitness_kws=fit_kws,
                                               evolution_kws=evo_kws,
