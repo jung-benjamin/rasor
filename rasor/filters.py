@@ -229,6 +229,23 @@ class NuclideFilter:
                 isotopes = [e for e in self.nuclides if reggy.fullmatch(e)]
                 self.data.loc[isotopes] *= (1 - fac)
 
+    def revert_element_reduction(self, element, factor=0.99):
+        """Reduce quantities of an element by a factor."""
+        if isinstance(element, str):
+            reggy = isotope_regex(element)
+            isotopes = [e for e in self.nuclides if reggy.fullmatch(e)]
+            self.data.loc[isotopes] /= (1 - factor)
+        else:
+            if isinstance(factor, (float, int)):
+                factor = [factor] * len(element)
+            if len(factor) != len(element):
+                msg = 'Factor should be float or same lengths as elements.'
+                raise Exception(msg)
+            for ele, fac in zip(element, factor):
+                reggy = isotope_regex(ele)
+                isotopes = [e for e in self.nuclides if reggy.fullmatch(e)]
+                self.data.loc[isotopes] /= (1 - fac)
+
     def select_by_concentration(self, threshold=10e-9, fraction=1):
         """Select nuclides if the concentration is above the threshold."""
         conc = self.data / self.data.sum(axis=0)
@@ -296,6 +313,11 @@ class NuclideFilter:
     def reduce_actinides(self, factor=0.99):
         """Reduce U and Pu content by the separation efficiency."""
         self.reduce_elements(['U', 'Pu'], factor=factor)
+
+    def revert_actinide_reduction(self):
+        """Revert reduction of U and Pu content by the separation efficiency."""
+        self.revert_element_reduction(['U', 'Pu'],
+                                      factor=self.actinide_reduction)
 
     def filter(self, threshold, fraction=1):
         """Filter nuclides by concentration threshold."""

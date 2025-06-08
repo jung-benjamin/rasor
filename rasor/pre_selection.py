@@ -104,6 +104,7 @@ def get_ratio_candidates(args):
     nuclide_filter.drop_elements = args.drop_element
     nuclide_filter.filter(args.threshold, fraction=args.fraction)
     if args.write_data:
+        nuclide_filter.revert_actinide_reduction()
         nuclide_filter.to_csv(args.write_data)
     ratios = nuclide_filter.get_ratio_options()
     return ratios
