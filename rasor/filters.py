@@ -7,13 +7,13 @@ from itertools import combinations, groupby
 import pandas as pd
 import radioactivedecay as rd
 
-NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)(\d+)(\*|m)?')
+NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
 NOBLE_GASES = ['He', 'Ne', 'Ar', 'Kr', 'Xe', 'Rn']
 
 
 def isotope_regex(element):
     """Compile regex for selecting isotopes of an element."""
-    return re.compile(f'{element}(-)?(\d)+(\*|m)?')
+    return re.compile(element + r'(-)?(\d)+(\*|m)?')
 
 
 def get_ground_state(nuclide):
@@ -330,3 +330,99 @@ class NuclideFilter:
         self.select_by_concentration(threshold=threshold, fraction=fraction)
         if self.drop_progeny:
             self.filter_decay_chain(drop_isotopes)
+
+
+class ElementFilter:
+
+    major_actinides = ["U", "Pu"]
+
+    def __init__(self,
+                 data,
+                 dilution_factor=60,
+                 actinide_reduction=0.9999,
+                 har_density=1.3):
+        """Initialize ElementFilter with data.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing nuclide data with nuclide IDs as the
+            index. Units of the data should be in g/cm3.
+        dilution_factor : float, optional
+            Factor by which the data is diluted during reprocessing.
+            Default is 60.
+        actinide_reduction : float, optional
+            Factor by which U and Pu are reduced to account for
+            reprocessing. Default is 0.9999 (99.99% reduction).
+        har_density : float, optional
+            Density of the HAR solution in g/cm3. Default is 1.3 g/cm3.
+        """
+        self.data = data.copy()
+        self._sum_isotopes()
+        self.dilution_factor = dilution_factor
+        self.actinide_reduction = actinide_reduction
+        self.har_density = har_density
+        self._process()
+
+    def _sum_isotopes(self):
+        """Prepare the DataFrame for element filtering.
+        
+        This method first adapts the index and then sums over all
+        isotopes of each element, resulting in a DataFrame with elements
+        as the index and their total mass densities.
+        """
+        self.data.index.name = "nuclide"
+        self.data.reset_index(inplace=True)
+        self.data["element"] = self.data["nuclide"].apply(get_element)
+        self.data.set_index(["element", "nuclide"], inplace=True)
+        self.data = self.data.groupby("element").sum()
+
+    def dilute(self):
+        """Approximate dilution during reprocessing.
+
+        Divides the data by the specified dilution factor.
+        """
+        self.data /= self.dilution_factor
+
+    def reduce_actinides(self):
+        """Reduce actinide concentrations to account for reprocessing."""
+        self.data.loc[self.major_actinides] *= (1 - self.actinide_reduction)
+
+    def calc_mass_fractions(self):
+        """Convert mass densities to mass fractions.
+        
+        Uses a given density of the HAR solution to convert the diluted
+        mass densities into mass fractions.
+        """
+        self.data /= self.har_density
+
+    def _process(self):
+        """Process the data through before filtering."""
+        self.dilute()
+        self.reduce_actinides()
+        self.calc_mass_fractions()
+
+    def filter(self, threshold=1e-9, percentile=0.25):
+        """Filter elements based on a mass fraction threshold.
+        
+        Parameters
+        ----------
+        threshold : float, optional
+            The minimum mass fraction for an element to be included in
+            the filtered data. Default is 1e-9. (1 ppb)
+        percentile : float, optional
+            The percentile to use for filtering. Default is 0.25 (25th
+            percentile).
+        
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing only the elements with mass fractions
+            above the specified threshold.
+        """
+        if (percentile * 100).is_integer():
+            percent_str = f"{int(percentile * 100)}%"
+        else:
+            percent_str = f"{percentile * 100}%"
+        return self.data[self.data.T.describe(
+            percentiles=[percentile]).loc[percent_str].T > threshold]
