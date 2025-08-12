@@ -1,14 +1,21 @@
 #! /usr/bin/env python3
 """Filter nuclides and ratios based on simulation data."""
 
+import importlib.resources as pkg_resources
+import json
 import re
 from itertools import combinations, groupby
 
+import numpy as np
 import pandas as pd
 import radioactivedecay as rd
 
 NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
 NOBLE_GASES = ['He', 'Ne', 'Ar', 'Kr', 'Xe', 'Rn']
+
+with pkg_resources.path(__package__, 'atomic_numbers.json') as p:
+    with open(p, 'r') as f:
+        ATOMIC_NUMBERS = json.load(f)
 
 
 def isotope_regex(element):
@@ -36,15 +43,37 @@ def is_excited(nuclide):
 
 def yield_ratio_options(nuclides):
     """Determine possible ratios from isotope list."""
-    isolist = sorted(nuclides, key=lambda x: x.split('-')[0])
-    for k, g in groupby(isolist, lambda x: x.split('-')[0]):
+    isolist = sorted(nuclides, key=get_element)
+    for k, g in groupby(isolist, get_element):
         for p, q in combinations(g, 2):
             yield f'{p}/{q}'
 
 
-def fill_chain(nucl, chain):
-    prog = rd.Nuclide(nucl).progeny()
+def fill_chain(nucl, chain, threshold=np.inf):
+    """Recursively fill decay chain of a nuclide.
+    
+    A threshold can be set to stop the recursion if the half-life
+    of a nuclide is above the threshold (in years).
+    
+    Parameters
+    ----------
+    nucl : str
+        The nuclide for which to find the decay chain.
+    chain : set
+        A set to store the nuclides in the decay chain.
+    threshold : float, optional
+        The half-life threshold in years to stop recursion. Default is
+        1e6 years (1 million years).
+    
+    Returns
+    -------
+    None
+    """
+    nuc = rd.Nuclide(nucl)
+    prog = nuc.progeny()
     if prog == []:
+        return
+    elif nuc.half_life("y") > threshold:
         return
     chain |= set(prog)
     for p in prog:
@@ -54,8 +83,12 @@ def fill_chain(nucl, chain):
             fill_chain(p, chain)
 
 
-def get_decay_chain(nuclide):
-    """Find set of nuclides in decay chain of a nuclide."""
+def get_decay_chain(nuclide, threshold=np.inf):
+    """Find set of nuclides in decay chain of a nuclide.
+    
+    Nuclides with a half-life above the threshold are not treated
+    as stable.
+    """
     chain = set()
     try:
         _ = rd.Nuclide(nuclide)
@@ -63,8 +96,37 @@ def get_decay_chain(nuclide):
         msg = f'Warning! {nuclide} not found in decay data.'
         print(msg)
     else:
-        fill_chain(nucl=nuclide, chain=chain)
+        fill_chain(nucl=nuclide, chain=chain, threshold=threshold)
     return chain
+
+
+def group_elements(nuclides):
+    """Group elements"""
+    return {
+        g: list(k)
+        for g, k in groupby(sorted(nuclides, key=get_element), key=get_element)
+    }
+
+
+class Filter:
+    """Base class for filters."""
+
+    def collect_nuclides(self, elements):
+        """Collect nuclides of the specified elements."""
+        nuclides = []
+        if isinstance(elements, str):
+            elements = [elements]
+        for element in elements:
+            isotopes = self.elements.get(element, [])
+            if not isotopes:
+                print(f"Warning! No isotopes found for element {element}.")
+                continue
+            nuclides.extend(isotopes)
+        return sorted(nuclides)
+
+    def __call__(self, *args, **kwargs):
+        """Call the filter with the specified elements."""
+        return self.filter(*args, **kwargs)
 
 
 class NuclideFilter:
@@ -332,7 +394,7 @@ class NuclideFilter:
             self.filter_decay_chain(drop_isotopes)
 
 
-class ElementFilter:
+class ElementThresholdFilter(Filter):
 
     major_actinides = ["U", "Pu"]
 
@@ -357,6 +419,8 @@ class ElementFilter:
         har_density : float, optional
             Density of the HAR solution in g/cm3. Default is 1.3 g/cm3.
         """
+        self.nuclides = list(data.index)
+        self.elements = group_elements(self.nuclides)
         self.data = data.copy()
         self._sum_isotopes()
         self.dilution_factor = dilution_factor
@@ -424,5 +488,95 @@ class ElementFilter:
             percent_str = f"{int(percentile * 100)}%"
         else:
             percent_str = f"{percentile * 100}%"
-        return self.data[self.data.T.describe(
-            percentiles=[percentile]).loc[percent_str].T > threshold]
+        below = self.data[self.data.T.describe(
+            percentiles=[percentile]).loc[percent_str].T < threshold]
+        return self.collect_nuclides(below.index)
+
+
+class DecayProgenyFilter(Filter):
+    """Filter to remove decay progeny of specified nuclides.
+    
+    If isotopes of elements that are removed of changed during
+    reprocessing decay, this does not affect the isotopic ratios
+    of this element. However, it does affect the ratios of the
+    decay product. The effect-size depends on the half-life.
+    """
+
+    def __init__(self, data, half_life_threshold=np.inf):
+        """Initialize the filter with a list of nuclides.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing nuclide data with nuclide IDs as the
+            index. Units of the data should be in g/cm3.
+        half_life_threshold : float, optional
+            Half-life threshold in years. Nuclides with a half-life
+            above this threshold will not be included in the decay
+            chain. Default is inf.
+        """
+        self.nuclides = list(data.index)
+        self.elements = group_elements(self.nuclides)
+        self.half_life_threshold = half_life_threshold
+
+    def collect_droppable_progeny(self, elements):
+        """Collect progeny of the specified elements.
+
+        Find a list of decay progeny for all isotopes of the specified
+        elements. The progeny that are an isotope of their decay parent
+        are not included.
+        
+        Parameters
+        ----------
+        elements : list of str
+            List of element symbols to collect progeny for.
+        
+        Returns
+        -------
+        set
+            A set of nuclides that are progeny of the specified elements.
+        """
+        progeny = set()
+        for element in elements:
+            isotopes = self.elements.get(element, [])
+            if not isotopes:
+                print(f"Warning! No isotopes found for element {element}.")
+                continue
+            element_progeny = set()
+            for iso in isotopes:
+                if iso.endswith("*"):
+                    iso = iso.replace("*", "m")
+                element_progeny |= get_decay_chain(
+                    iso, threshold=self.half_life_threshold)
+
+            # Decay progeny that are isotopes of the same element
+            # are not included in the progeny set.
+            if any([n.endswith("*") for n in element_progeny]):
+                print(
+                    f"Decay of element {element} produces excited states.!!!")
+            progeny |= (element_progeny - set(isotopes))
+        return progeny
+
+    def filter(self, elements):
+        """Return all isotopes of the specified elements."""
+        return self.collect_droppable_progeny(elements)
+
+
+class ElementFilter(Filter):
+    """Filter to remove all isotopes of specified elements."""
+
+    def __init__(self, data):
+        """Initialize the filter with a list of nuclides.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing nuclide data with nuclide IDs as the
+            index. Units of the data should be in g/cm3.
+        """
+        self.nuclides = list(data.index)
+        self.elements = group_elements(self.nuclides)
+
+    def filter(self, elements):
+        """Return all isotopes of the specified elements."""
+        return self.collect_nuclides(elements)
