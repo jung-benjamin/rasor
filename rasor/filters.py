@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import radioactivedecay as rd
 
-NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
+NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?|n)?')
 NOBLE_GASES = ['He', 'Ne', 'Ar', 'Kr', 'Xe', 'Rn']
 
 with pkg_resources.path(__package__, 'atomic_numbers.json') as p:
@@ -33,6 +33,8 @@ def get_ground_state(nuclide):
 def get_element(nuclide):
     """Determine element of a nuclide."""
     n = NUCLIDE_REGEX.fullmatch(nuclide)
+    if n is None:
+        breakpoint()
     return n.group(1)
 
 

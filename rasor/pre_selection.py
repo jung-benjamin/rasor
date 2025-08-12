@@ -12,8 +12,6 @@ import pandas as pd
 from . import filters
 from .logger_config import configure_logger
 
-NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
-
 
 class PathEncoder(json.JSONEncoder):
     """JSONEncoder that supports Path objects."""
@@ -108,7 +106,7 @@ def argparser():
 
 def format_nuclide_id(nuclide_id):
     """Format nuclide ID to a standard form."""
-    match = NUCLIDE_REGEX.match(nuclide_id)
+    match = filters.NUCLIDE_REGEX.match(nuclide_id)
     if not match:
         raise ValueError(f"Invalid nuclide ID format: {nuclide_id}")
     element, dash, mass_number, modifier = match.groups()
