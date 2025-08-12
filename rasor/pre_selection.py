@@ -4,9 +4,14 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 
-from .filters import NuclideFilter
+import pandas as pd
+
+from . import filters
+
+NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
 
 
 class PathEncoder(json.JSONEncoder):
@@ -82,12 +87,31 @@ def argparser():
                         default=Path('ratio_candidates.json'))
     write_data = 'File for storing the filtered data to csv.'
     parser.add_argument('--write-data', help=write_data, type=Path)
+    parser.add_argument("--v1",
+                        help="Use old pre-selection method.",
+                        action="store_true")
     return parser.parse_args()
+
+
+def format_nuclide_id(nuclide_id):
+    """Format nuclide ID to a standard form."""
+    match = NUCLIDE_REGEX.match(nuclide_id)
+    if not match:
+        raise ValueError(f"Invalid nuclide ID format: {nuclide_id}")
+    element, dash, mass_number, modifier = match.groups()
+    match modifier:
+        case "*" | "m" | "m1":
+            excited = f"m"
+        case "m2":
+            excited = f"n"
+        case _:
+            excited = ""
+    return f"{element}{mass_number}{excited}"
 
 
 def get_ratio_candidates(args):
     """Filter nuclides and determine possible ratios."""
-    nuclide_filter = NuclideFilter.from_csv(args.datafile)
+    nuclide_filter = filters.NuclideFilter.from_csv(args.datafile)
     if args.exclude_file:
         with args.exclude_file.open() as f:
             exclude = json.load(f)
@@ -107,6 +131,62 @@ def get_ratio_candidates(args):
         nuclide_filter.revert_actinide_reduction()
         nuclide_filter.to_csv(args.write_data)
     ratios = nuclide_filter.get_ratio_options()
+    return ratios
+
+
+def get_ratio_candidates_v2(args):
+    """Filter nuclides and determine possible ratios."""
+
+    if args.write_data:
+        print("Warning: --write-data option is not supported in v2 mode." +
+              "\n Ignoring this flag.")
+    if args.excited_states != 'keep':
+        print("Warning: --excited-states option is not supported in v2 mode." +
+              "\n Ignoring this flag.")
+
+    if isinstance(args.datafile, list):
+        dlist = [pd.read_csv(i, index_col=0) for i in args.datafile]
+        data = pd.concat(dlist, axis=1)
+    else:
+        data = pd.read_csv(args.datafile, index_col=0)
+    data.index.name = "nuclide"
+    data.index = data.index.map(format_nuclide_id)
+
+    element_threshold_filter = filters.ElementThresholdFilter(
+        data, actinide_reduction=args.actinide_reduction)
+    decay_progeny_filter = filters.DecayProgenyFilter(data)
+    element_filter = filters.ElementFilter(data)
+
+    # Some elements should be kept
+    protected_elements = ["U", "Pu"]
+    protected_nuclides = []
+    for element in protected_elements:
+        protected_nuclides.extend(element_filter.elements.get(element))
+
+    nuclides = set(data.index)
+    drop_nuclides = set(
+        element_threshold_filter(args.threshold, percentile=args.fraction))
+    if args.drop_noble:
+        drop_nuclides |= set(element_filter(filters.NOBLE_GASES))
+    if args.drop_oxygen:
+        drop_nuclides |= set(element_filter("O"))
+    if args.drop_noble_progeny:
+        drop_nuclides |= set(decay_progeny_filter(filters.NOBLE_GASES))
+    if args.drop_element_progeny:
+        drop_nuclides |= set(decay_progeny_filter(args.drop_element_progeny))
+    if args.drop_element:
+        drop_nuclides |= set(element_filter(args.drop_element))
+    if args.exclude_file:
+        with args.exclude_file.open() as f:
+            exclude = json.load(f)
+        drop_nuclides |= set(exclude)
+
+    drop_nuclides -= set(protected_nuclides)  # Keep U and Pu isotopes
+    nuclides -= set(format_nuclide_id(n) for n in drop_nuclides)
+
+    if not nuclides:
+        raise ValueError('No nuclides left after filtering.')
+    ratios = list(filters.yield_ratio_options(nuclides))
     return ratios
 
 
@@ -141,7 +221,12 @@ def store_metadata(args):
 def select_candidates():
     """Pre-select isotope ratio candidates"""
     args = argparser()
-    ratios = get_ratio_candidates(args)
+    if args.v1:
+        print(f"Using v1 pre-selection method.")
+        ratios = get_ratio_candidates(args)
+    else:
+        print(f"Using v2 pre-selection method.")
+        ratios = get_ratio_candidates_v2(args)
     print(f'Selected {len(ratios)} candidate ratios.')
     write_output(ratios=ratios, fp=args.outfile)
     store_metadata(args=args)
