@@ -3,6 +3,7 @@
 
 import importlib.resources as pkg_resources
 import json
+import logging
 import re
 from itertools import combinations, groupby
 
@@ -94,7 +95,7 @@ def get_decay_chain(nuclide, threshold=np.inf):
         _ = rd.Nuclide(nuclide)
     except ValueError:
         msg = f'Warning! {nuclide} not found in decay data.'
-        print(msg)
+        logging.getLogger("DecayChain").warning(msg)
     else:
         fill_chain(nucl=nuclide, chain=chain, threshold=threshold)
     return chain
@@ -111,6 +112,11 @@ def group_elements(nuclides):
 class Filter:
     """Base class for filters."""
 
+    @property
+    def logger(self):
+        """Get logger."""
+        return logging.getLogger(self.__class__.__name__)
+
     def collect_nuclides(self, elements):
         """Collect nuclides of the specified elements."""
         nuclides = []
@@ -119,7 +125,8 @@ class Filter:
         for element in elements:
             isotopes = self.elements.get(element, [])
             if not isotopes:
-                print(f"Warning! No isotopes found for element {element}.")
+                msg = f"Warning! No isotopes found for element {element}."
+                self.logger.warning(msg)
                 continue
             nuclides.extend(isotopes)
         return sorted(nuclides)
@@ -546,7 +553,8 @@ class DecayProgenyFilter(Filter):
         for element in elements:
             isotopes = self.elements.get(element, [])
             if not isotopes:
-                print(f"Warning! No isotopes found for element {element}.")
+                msg = f"Warning! No isotopes found for element {element}."
+                self.logger.warning(msg)
                 continue
             element_progeny = set()
             for iso in isotopes:
@@ -560,7 +568,9 @@ class DecayProgenyFilter(Filter):
             if any([n.endswith("*") for n in element_progeny]):
                 print(
                     f"Decay of element {element} produces excited states.!!!")
-            progeny |= (element_progeny - set(isotopes))
+            drop_set = (element_progeny - set(isotopes))
+            self.logger.info(f"Dropping progeny of {element}: {drop_set}")
+            progeny |= drop_set
         return progeny
 
     def filter(self, elements):
