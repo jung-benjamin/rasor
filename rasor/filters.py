@@ -586,3 +586,55 @@ class ElementFilter(Filter):
     def filter(self, elements):
         """Return all isotopes of the specified elements."""
         return self.collect_nuclides(elements)
+
+
+class NuclideThresholdFilter(ElementThresholdFilter):
+    """Filter to remove nuclides below a specified threshold."""
+
+    def __init__(self,
+                 data,
+                 dilution_factor=60,
+                 actinide_reduction=0.9999,
+                 har_density=1.3):
+        """Initialize ElementFilter with data.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing nuclide data with nuclide IDs as the
+            index. Units of the data should be in g/cm3.
+        dilution_factor : float, optional
+            Factor by which the data is diluted during reprocessing.
+            Default is 60.
+        actinide_reduction : float, optional
+            Factor by which U and Pu are reduced to account for
+            reprocessing. Default is 0.9999 (99.99% reduction).
+        har_density : float, optional
+            Density of the HAR solution in g/cm3. Default is 1.3 g/cm3.
+        """
+        self.nuclides = list(data.index)
+        self.elements = group_elements(self.nuclides)
+        self.data = data.copy()
+        self.dilution_factor = dilution_factor
+        self.actinide_reduction = actinide_reduction
+        self.har_density = har_density
+        self._process()
+
+    def reduce_actinides(self):
+        """Reduce actinide concentrations to account for reprocessing."""
+        major_actinide_isotopes = []
+        for actinide in self.major_actinides:
+            major_actinide_isotopes.extend(self.elements.get(actinide, []))
+        self.data.loc[major_actinide_isotopes] *= (1 - self.actinide_reduction)
+
+    def _process(self):
+        """Process the data through before filtering."""
+        self.dilute()
+        self.reduce_actinides()
+        self.calc_mass_fractions()
+
+    def filter(self, threshold=1e-9, percentile=0.25):
+        """Filter elements based on a mass fraction threshold."""
+        below = self.compare_threshold(threshold=threshold,
+                                       percentile=percentile)
+        return below.index.tolist()
