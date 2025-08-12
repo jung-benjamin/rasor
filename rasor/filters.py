@@ -75,7 +75,7 @@ def fill_chain(nucl, chain, threshold=np.inf):
         return
     elif nuc.half_life("y") > threshold:
         return
-    chain |= set(prog)
+    chain |= (set(prog) - {"SF"})
     for p in prog:
         if p == 'SF':
             continue
