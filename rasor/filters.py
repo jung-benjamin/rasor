@@ -33,9 +33,13 @@ def get_ground_state(nuclide):
 def get_element(nuclide):
     """Determine element of a nuclide."""
     n = NUCLIDE_REGEX.fullmatch(nuclide)
-    if n is None:
-        breakpoint()
     return n.group(1)
+
+
+def get_mass_number(nuclide):
+    """Get mass number of a nuclide."""
+    n = NUCLIDE_REGEX.fullmatch(nuclide)
+    return int(n.group(3))
 
 
 def is_excited(nuclide):
@@ -650,3 +654,38 @@ class NuclideThresholdFilter(ElementThresholdFilter):
         below = self.compare_threshold(threshold=threshold,
                                        percentile=percentile)
         return below.index.tolist()
+
+
+class MassNumberFilter(Filter):
+    """Filter to remove nuclides based on mass number."""
+
+    def __init__(self, data):
+        """Initialize ElementFilter with data.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing nuclide data with nuclide IDs as the
+            index. Units of the data should be in g/cm3.
+        """
+        self.nuclides = list(data.index)
+        self.mass_numbers = pd.Series(
+            {n: int(get_mass_number(n))
+             for n in self.nuclides})
+
+    def filter(self, mass_number):
+        """Return isotopes lower or equal to a specified mass number.
+        
+        Parameters
+        ----------
+        mass_number : int
+            The mass number threshold.
+        
+        Returns
+        -------
+        list
+            A list of nuclides with mass numbers less than or equal to the
+            specified mass number.
+        """
+        return self.mass_numbers[self.mass_numbers <=
+                                 mass_number].index.tolist()

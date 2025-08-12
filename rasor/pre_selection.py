@@ -167,6 +167,7 @@ def get_ratio_candidates_v2(args):
         data, actinide_reduction=args.actinide_reduction)
     decay_progeny_filter = filters.DecayProgenyFilter(data)
     element_filter = filters.ElementFilter(data)
+    mass_filter = filters.MassNumberFilter(data)
 
     # Some elements should be kept
     protected_elements = ["U", "Pu"]
@@ -191,6 +192,8 @@ def get_ratio_candidates_v2(args):
         with args.exclude_file.open() as f:
             exclude = json.load(f)
         drop_nuclides |= set(exclude)
+
+    drop_nuclides |= set(mass_filter(30))
 
     drop_nuclides -= set(protected_nuclides)  # Keep U and Pu isotopes
     nuclides -= set(format_nuclide_id(n) for n in drop_nuclides)
