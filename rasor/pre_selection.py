@@ -163,7 +163,7 @@ def get_ratio_candidates_v2(args):
     data.index.name = "nuclide"
     data.index = data.index.map(format_nuclide_id)
 
-    element_threshold_filter = filters.ElementThresholdFilter(
+    element_threshold_filter = filters.NuclideThresholdFilter(
         data, actinide_reduction=args.actinide_reduction)
     decay_progeny_filter = filters.DecayProgenyFilter(data)
     element_filter = filters.ElementFilter(data)
