@@ -466,7 +466,7 @@ class ElementThresholdFilter(Filter):
         self.reduce_actinides()
         self.calc_mass_fractions()
 
-    def filter(self, threshold=1e-9, percentile=0.25):
+    def compare_threshold(self, threshold=1e-9, percentile=0.25):
         """Filter elements based on a mass fraction threshold.
         
         Parameters
@@ -490,6 +490,12 @@ class ElementThresholdFilter(Filter):
             percent_str = f"{percentile * 100}%"
         below = self.data[self.data.T.describe(
             percentiles=[percentile]).loc[percent_str].T < threshold]
+        return below
+
+    def filter(self, threshold=1e-9, percentile=0.25):
+        """Filter elements based on a mass fraction threshold."""
+        below = self.compare_threshold(threshold=threshold,
+                                       percentile=percentile)
         return self.collect_nuclides(below.index)
 
 
