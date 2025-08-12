@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import filters
+from .logger_config import configure_logger
 
 NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?)?')
 
@@ -90,6 +91,18 @@ def argparser():
     parser.add_argument("--v1",
                         help="Use old pre-selection method.",
                         action="store_true")
+    parser.add_argument(
+        "--log-level",
+        help="Set log level for the pre-selection script.",
+        default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+    parser.add_argument("--log-path",
+                        help="Path to the log file.",
+                        type=Path,
+                        default=None)
+    parser.add_argument("--log-format",
+                        help="Format string for the log messages.",
+                        default='%(levelname)s:%(name)s:%(message)s')
     return parser.parse_args()
 
 
@@ -221,6 +234,14 @@ def store_metadata(args):
 def select_candidates():
     """Pre-select isotope ratio candidates"""
     args = argparser()
+    configure_logger(filters.DecayProgenyFilter,
+                     loglevel=args.log_level,
+                     logpath=args.log_path,
+                     formatstr=args.log_format)
+    configure_logger("DecayChain",
+                     loglevel=args.log_level,
+                     logpath=args.log_path,
+                     formatstr=args.log_format)
     if args.v1:
         print(f"Using v1 pre-selection method.")
         ratios = get_ratio_candidates(args)
