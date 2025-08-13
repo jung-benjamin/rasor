@@ -489,7 +489,7 @@ class ElementThresholdFilter(Filter):
             the filtered data. Default is 1e-9. (1 ppb)
         percentile : float, optional
             The percentile to use for filtering. Default is 0.25 (25th
-            percentile).
+            percentile). Is rounded to first decimal of percent value.
         
         Returns
         -------
@@ -497,6 +497,7 @@ class ElementThresholdFilter(Filter):
             A DataFrame containing only the elements with mass fractions
             above the specified threshold.
         """
+        percentile = np.round(percentile, 3)
         if (percentile * 100).is_integer():
             percent_str = f"{int(percentile * 100)}%"
         else:
