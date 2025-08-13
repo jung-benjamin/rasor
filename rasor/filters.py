@@ -692,3 +692,23 @@ class MassNumberFilter(Filter):
         """
         return self.mass_numbers[self.mass_numbers <=
                                  mass_number].index.tolist()
+
+
+class FilterFactory:
+    """Factory class to create filters based on type."""
+
+    filters = {
+        "nuclide_threshold": NuclideThresholdFilter,
+        "element_threshold": ElementThresholdFilter,
+        "decay_progeny": DecayProgenyFilter,
+        "element": ElementFilter,
+        "mass_number": MassNumberFilter
+    }
+
+    @staticmethod
+    def create_filter(filter_type, data, **kwargs):
+        """Create a filter of the specified type."""
+        filter_class = FilterFactory.filters.get(filter_type)
+        if filter_class is None:
+            raise ValueError(f"Unknown filter type: {filter_type}")
+        return filter_class(data, **kwargs)
