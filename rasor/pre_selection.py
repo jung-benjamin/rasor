@@ -101,6 +101,10 @@ def argparser():
     parser.add_argument("--log-format",
                         help="Format string for the log messages.",
                         default='%(levelname)s:%(name)s:%(message)s')
+    parser.add_argument("--threshold-filter",
+                        help="Choose the threshold filter type.",
+                        choices=["nuclide", "element"],
+                        default="nuclide")
     return parser.parse_args()
 
 
@@ -165,7 +169,12 @@ def get_ratio_candidates_v2(args):
     data.index.name = "nuclide"
     data.index = data.index.map(format_nuclide_id)
 
-    element_threshold_filter = filters.NuclideThresholdFilter(
+    threshold_filters = {
+        "nuclide": filters.NuclideThresholdFilter,
+        "element": filters.ElementThresholdFilter
+    }
+
+    threshold_filter = threshold_filters[args.threshold_filter](
         data, actinide_reduction=args.actinide_reduction)
     decay_progeny_filter = filters.DecayProgenyFilter(data)
     element_filter = filters.ElementFilter(data)
@@ -180,7 +189,7 @@ def get_ratio_candidates_v2(args):
 
     nuclides = set(data.index)
     drop_nuclides = set(
-        element_threshold_filter(args.threshold, percentile=args.fraction))
+        threshold_filter(args.threshold, percentile=args.fraction))
     if args.drop_noble:
         drop_nuclides |= set(element_filter(filters.NOBLE_GASES))
     if args.drop_oxygen:
