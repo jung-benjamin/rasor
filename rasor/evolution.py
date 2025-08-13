@@ -183,6 +183,22 @@ class FitnessLookup(Fitness):
         return metric()
 
 
+class MultiModelFitness:
+    """Fitness function combining multiple fitness functions."""
+
+    def __init__(self, data, lookup=True, **kwargs):
+        if lookup is True:
+            self.fitness_functions = [
+                FitnessLookup(data=d, **kwargs) for d in data
+            ]
+        else:
+            self.fitness_functions = [Fitness(data=d, **kwargs) for d in data]
+
+    def __call__(self, gene):
+        """Call each fitness function and return mean of values."""
+        return np.mean([f(gene) for f in self.fitness_functions])
+
+
 def split_into_chunks(lst, n):
     """Split a list into n equal chunks."""
     # Calculate the size of each chunk
@@ -453,7 +469,8 @@ def natural_selection(fitness_kws,
                       evolution_kws,
                       max_iter,
                       log_kwargs=None,
-                      lookup=False):
+                      lookup=False,
+                      multi_model=False):
     """Apply genetic selection"""
     logging.getLogger().debug(f'Log kwargs in natural selection: {log_kwargs}')
     if log_kwargs:
@@ -467,7 +484,12 @@ def natural_selection(fitness_kws,
         Evolution.config_logger(**log_kwargs)
         MutationFactory.config_logger(**log_kwargs)
         Fitness.config_logger(**log_kwargs)
-    if lookup:
+    if multi_model:
+        assert isinstance(
+            fitness_kws["data"], (list, tuple)
+        ), "Multi model fitness function only works with multiple models."
+        fitness_func = MultiModelFitness(**fitness_kws, lookup=lookup)
+    elif lookup:
         fitness_func = FitnessLookup(**fitness_kws)
     else:
         fitness_func = Fitness(**fitness_kws)
@@ -494,7 +516,8 @@ class GalapagosIslands:
                  max_iter=20,
                  rng_seed=12345,
                  use_lookup=False,
-                 use_combined=False):
+                 use_combined=False,
+                 use_multi_model=False):
         """Define the test space and set the metric."""
         test_point_dispatcher = {
             np.ndarray: self.set_test_points,
@@ -517,6 +540,7 @@ class GalapagosIslands:
         self.max_iter = max_iter
         self.use_lookup = use_lookup
         self.use_combined = use_combined
+        self.use_multi_model = use_multi_model
 
     def set_test_points(self, tp):
         """Set the test point array."""
@@ -582,7 +606,8 @@ class GalapagosIslands:
         best, fitness = natural_selection(fitness_kws=fit_kws,
                                           evolution_kws=evo_kws,
                                           max_iter=self.max_iter,
-                                          lookup=self.use_lookup)
+                                          lookup=self.use_lookup,
+                                          multi_model=self.use_multi_model)
         return best, fitness
 
     def _scan(self):
@@ -610,7 +635,8 @@ class GalapagosIslands:
             best, fitness = natural_selection(fitness_kws=fit_kws,
                                               evolution_kws=evo_kws,
                                               max_iter=self.max_iter,
-                                              lookup=self.use_lookup)
+                                              lookup=self.use_lookup,
+                                              multi_model=self.use_multi_model)
             best_genes.append(best)
             fitness_evolution.append(fitness)
         return best_genes, fitness_evolution
