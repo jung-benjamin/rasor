@@ -139,7 +139,9 @@ class Filter:
 
     def __call__(self, *args, **kwargs):
         """Call the filter with the specified elements."""
-        return self.filter(*args, **kwargs)
+        filter = self.filter(*args, **kwargs)
+        self.logger.debug(f"Filtering : {filter}")
+        return filter
 
 
 class NuclideFilter:
