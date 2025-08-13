@@ -247,10 +247,11 @@ def store_metadata(args):
 def select_candidates():
     """Pre-select isotope ratio candidates"""
     args = argparser()
-    configure_logger(filters.DecayProgenyFilter,
-                     loglevel=args.log_level,
-                     logpath=args.log_path,
-                     formatstr=args.log_format)
+    for filter in filters.FilterFactory.filters.values():
+        configure_logger(filter,
+                         loglevel=args.log_level,
+                         logpath=args.log_path,
+                         formatstr=args.log_format)
     configure_logger("DecayChain",
                      loglevel=args.log_level,
                      logpath=args.log_path,
