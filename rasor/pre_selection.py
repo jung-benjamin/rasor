@@ -171,11 +171,12 @@ def get_ratio_candidates_v2(args):
     element_filter = filters.ElementFilter(data)
     mass_filter = filters.MassNumberFilter(data)
 
-    # Some elements should be kept
-    protected_elements = ["U", "Pu"]
-    protected_nuclides = []
-    for element in protected_elements:
-        protected_nuclides.extend(element_filter.elements.get(element))
+    # The major actinides should not be removed from the data.
+    # (Except for very rare isotopes)
+    protected_nuclides = [
+        "U234", "U235", "U236", "U238", "Pu238", "Pu239", "Pu240", "Pu241",
+        "Pu242"
+    ]
 
     nuclides = set(data.index)
     drop_nuclides = set(
@@ -197,8 +198,8 @@ def get_ratio_candidates_v2(args):
 
     drop_nuclides |= set(mass_filter(30))
 
-    drop_nuclides -= set(protected_nuclides)  # Keep U and Pu isotopes
     nuclides -= set(format_nuclide_id(n) for n in drop_nuclides)
+    nuclides |= set(format_nuclide_id(n) for n in protected_nuclides)
 
     if not nuclides:
         raise ValueError('No nuclides left after filtering.')
