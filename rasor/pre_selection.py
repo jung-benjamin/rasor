@@ -188,8 +188,10 @@ def get_ratio_candidates_v2(args):
     ]
 
     nuclides = set(data.index)
+    # Fraction is number of datapoints above threshold.
+    # Therefore, the percentile is 1 - fraction.
     drop_nuclides = set(
-        threshold_filter(args.threshold, percentile=args.fraction))
+        threshold_filter(args.threshold, percentile=1 - args.fraction))
     if args.drop_noble:
         drop_nuclides |= set(element_filter(filters.NOBLE_GASES))
     if args.drop_oxygen:
