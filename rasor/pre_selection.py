@@ -113,10 +113,12 @@ def format_nuclide_id(nuclide_id):
     match modifier:
         case "*" | "m" | "m1":
             excited = f"m"
-        case "m2":
+        case "m2" | "n":
             excited = f"n"
-        case _:
+        case None:
             excited = ""
+        case _:
+            raise ValueError(f"Unknown modifier in nuclide ID: {modifier}")
     return f"{element}{mass_number}{excited}"
 
 
