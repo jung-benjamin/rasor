@@ -3,6 +3,7 @@
 
 import json
 import warnings
+from copy import deepcopy
 from itertools import chain, combinations
 from multiprocessing import Pool
 
@@ -196,6 +197,39 @@ class Minotaur:
         else:
             keys, solubility = self._scan()
         return keys, solubility
+
+
+class MultiMinotaur:
+    """Run multiple minotaur fights.
+    
+    Should only be used with use_combined=False. Otherwise the models
+    are averaged after the metric is averaged."""
+
+    def __init__(self, **kwargs):
+        surrogates = kwargs["metric_params"]["Likelihood"].pop("surrogates")
+        assert isinstance(surrogates, (list, tuple))
+        self.minotaurs = []
+        for sur in surrogates:
+            kwarg_cp = deepcopy(kwargs)
+            kwarg_cp["metric_params"]["Likelihood"]["surrogates"] = sur
+            self.minotaurs.append(Minotaur(**kwarg_cp))
+
+    def fight(self, num_proc=1):
+        """Calculate solubility matrix of each minotaur."""
+        keys, solubility = [], []
+        for m in self.minotaurs:
+            k, s = m.fight(num_proc=num_proc)
+            keys.append(k)
+            solubility.append(s)
+
+        # Average over the minotaur dimension
+        # In the future it may be better to return the matrices
+        # without averaging, as matrix could be useful by itself.
+        # For now, this would probably break the processing code.
+        solubility = np.mean(np.array(solubility), axis=0)
+
+        # keys are all ordered the same way (preserved by starmap)
+        return keys[0], solubility
 
 
 class BabyMinotaur(Minotaur):
