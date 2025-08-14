@@ -311,6 +311,50 @@ class Aftermath:
             return sorted(selected)
 
 
+class MultiAftermath(Aftermath):
+    """Combine results of multiple Minotaur fights.
+    
+    Do not use for the results of the MultiMinotaur class!
+    Those results are already averaged and can be handled
+    with the regular aftermath.
+    """
+
+    def __init__(self, key_lists, solubility):
+        """Set solubility matrix and keys for each axis."""
+        # Ensure that key list all contain the same keys
+        assert all(set(keys) == set(key_lists[0]) for keys in key_lists)
+
+        # Sort all key lists and solubility in the same
+        # order as the first key list
+        key_order = {k: i for i, k in enumerate(key_lists[0])}
+        sorted_key_lists = []
+        sorted_solubility = []
+
+        for keys, sol in zip(key_lists, solubility):
+            idx = [key_order[k] for k in keys]
+            sorted_keys = [keys[i] for i in np.argsort(idx)]
+            sorted_sol = np.array(sol)[np.argsort(idx)]
+            sorted_key_lists.append(sorted_keys)
+            sorted_solubility.append(sorted_sol)
+
+        self.keys = np.array(sorted_key_lists[0])
+        self.matrix = np.mean(np.array(sorted_solubility), axis=0)
+
+    @classmethod
+    def from_json(cls, *fp):
+        """Construct class from data in json files."""
+        # If a single list is passed, assume it contains a list of files
+        if len(fp) == 1 and isinstance(fp[0], list):
+            fp = fp.pop(0)
+        key_lists, solubility_matrices = [], []
+        for f in fp:
+            with open(f, 'r') as file:
+                d = json.load(file)
+            key_lists.append(list(d.keys()))
+            solubility_matrices.append(list(d.values()))
+        return cls(key_lists=key_lists, solubility=solubility_matrices)
+
+
 class LootCollector:
     """Find the unique ratios among the selection of best ratio sets."""
 

@@ -12,7 +12,8 @@ import numpy as np
 from mpi4py import MPI
 
 from rasor import config_global_logging
-from rasor.bruteforce import Aftermath, BabyMinotaur, Minotaur, MultiMinotaur
+from rasor.bruteforce import (Aftermath, BabyMinotaur, Minotaur,
+                              MultiAftermath, MultiMinotaur)
 from rasor.evolution import GalapagosIslands
 
 
@@ -129,8 +130,14 @@ def just_aftermath():
     def argparser():
         """Parse command line arguments."""
         parser = argparse.ArgumentParser()
-        metric_file = "JSON file with the metric values."
-        parser.add_argument("metric_file", help=metric_file)
+        metric_file = """
+            JSON file with the metric values. If multiple files are given,
+            they are averaged with the MultiAftermath class.
+            """
+        parser.add_argument("metric_file",
+                            help=metric_file,
+                            type=Path,
+                            nargs="+")
         depth = "Depth of the search for best ratios."
         parser.add_argument("-d",
                             "--depth",
@@ -147,7 +154,10 @@ def just_aftermath():
         return parser.parse_args()
 
     args = argparser()
-    aftermath = Aftermath.from_json(args.metric_file)
+    if len(args.metric_file) > 1:
+        aftermath = MultiAftermath.from_json(*args.metric_file)
+    else:
+        aftermath = Aftermath.from_json(*args.metric_file)
     best_ratios = aftermath.find_best_ratios(depth=args.depth,
                                              target_number=args.target_number)
     with open(args.output, 'w') as f:
