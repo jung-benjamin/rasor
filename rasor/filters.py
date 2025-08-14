@@ -575,7 +575,7 @@ class DecayProgenyFilter(Filter):
             # Decay progeny that are isotopes of the same element
             # are not included in the progeny set.
             if any([n.endswith("*") for n in element_progeny]):
-                print(
+                self.logger.warning(
                     f"Decay of element {element} produces excited states.!!!")
             drop_set = (element_progeny - set(isotopes))
             self.logger.info(f"Dropping progeny of {element}: {drop_set}")
