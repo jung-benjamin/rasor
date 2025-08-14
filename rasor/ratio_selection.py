@@ -12,7 +12,8 @@ import numpy as np
 from mpi4py import MPI
 
 from rasor import config_global_logging
-from rasor.bruteforce import Aftermath, BabyMinotaur, Minotaur
+from rasor.bruteforce import (Aftermath, BabyMinotaur, Minotaur,
+                              MultiAftermath, MultiMinotaur)
 from rasor.evolution import GalapagosIslands
 
 
@@ -77,14 +78,27 @@ def parse_input_file(infile):
             **algorithm_kws[algorithm])
         return {'algorithm': islands}
     elif algorithm == 'brute_force':
+        if algorithm_kws.get(algorithm):
+            Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
+            if algorithm_kws[algorithm].get("use_multi_model", False):
+                battering_ram = MultiMinotaur(
+                    ratios=ratios,
+                    test_points=test_points,
+                    metric_params=arg_dict,
+                    use_combined=algorithm_kws[algorithm].get(
+                        'use_combined', False),
+                    use_lookup=algorithm_kws[algorithm].get(
+                        'use_lookup', False))
+                return {
+                    'algorithm': battering_ram,
+                    'depth': algorithm_kws[algorithm].get('depth', 1)
+                }
         battering_ram = Minotaur(
             ratios=ratios,
             test_points=test_points,
             metric_params=arg_dict,
             use_combined=algorithm_kws[algorithm].get('use_combined', False),
             use_lookup=algorithm_kws[algorithm].get('use_lookup', False))
-        if algorithm_kws.get(algorithm):
-            Minotaur.set_combo_length(algorithm_kws[algorithm]['combo_length'])
         return {
             'algorithm': battering_ram,
             'depth': algorithm_kws[algorithm].get('depth', 1)
@@ -100,7 +114,7 @@ def parse_input_file(infile):
 
 def select_ratios(algorithm, ncores=1, log_kwargs=None, **kwargs):
     """Use the algorithm to select isotopic ratios."""
-    if isinstance(algorithm, Minotaur):
+    if isinstance(algorithm, (Minotaur, MultiMinotaur)):
         afterwards = Aftermath(*algorithm.fight(num_proc=ncores))
         selected = afterwards.find_best_ratios(depth=kwargs.get('depth', 1))
         metric_vals = dict(zip(afterwards.keys, afterwards.matrix))
@@ -116,8 +130,14 @@ def just_aftermath():
     def argparser():
         """Parse command line arguments."""
         parser = argparse.ArgumentParser()
-        metric_file = "JSON file with the metric values."
-        parser.add_argument("metric_file", help=metric_file)
+        metric_file = """
+            JSON file with the metric values. If multiple files are given,
+            they are averaged with the MultiAftermath class.
+            """
+        parser.add_argument("metric_file",
+                            help=metric_file,
+                            type=Path,
+                            nargs="+")
         depth = "Depth of the search for best ratios."
         parser.add_argument("-d",
                             "--depth",
@@ -134,7 +154,10 @@ def just_aftermath():
         return parser.parse_args()
 
     args = argparser()
-    aftermath = Aftermath.from_json(args.metric_file)
+    if len(args.metric_file) > 1:
+        aftermath = MultiAftermath.from_json(*args.metric_file)
+    else:
+        aftermath = Aftermath.from_json(*args.metric_file)
     best_ratios = aftermath.find_best_ratios(depth=args.depth,
                                              target_number=args.target_number)
     with open(args.output, 'w') as f:

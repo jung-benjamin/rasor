@@ -35,6 +35,25 @@ class Fitness:
                  score_type='uncertainty',
                  metric_type='max',
                  num_proc=1):
+        """Initialize the fitness function without lookup tables.
+
+        Creates to instances of FrozenSurrogateLookUp, one for the
+        input samples and one for the test points.
+
+        Parameters
+        ----------
+        gene_pool : list(str)
+            List of isotopic ratios.
+        data : dict
+            Dictionary with x and y data for the interpolation-based
+            surrogate models.
+        test_points : np.ndarray
+            Array of test points for the likelihood evaluation.
+        uncertainty_kwargs : dict
+            Keyword arguments for the uncertainty model.
+        marginal_kwargs : dict
+            Keyword arguments for the marginal likelihood approximation.
+        """
         self.models = SurrogateCollection.from_ratiolist(**data,
                                                          ratios=gene_pool)
         self.test_point = test_point
@@ -118,56 +137,17 @@ class Fitness:
 class FitnessLookup(Fitness):
     """Evalute fitness using lookup-table-based classes."""
 
-    def __init__(self,
-                 gene_pool,
-                 data,
-                 test_point,
-                 uncertainty_kwargs,
-                 marginal_kwargs,
-                 score_type='uncertainty',
-                 metric_type='max',
-                 num_proc=1):
+    def __init__(self, *args, **kwargs):
         """Initialize the fitness function with lookkup tables.
 
-        Creates to instances of FrozenSurrogateLookUp, one for the
+        Creates instances of FrozenSurrogateLookUp, one for the
         input samples and one for the test points.
-
-        Parameters
-        ----------
-        gene_pool : list(str)
-            List of isotopic ratios.
-        data : dict
-            Dictionary with x and y data for the interpolation-based
-            surrogate models.
-        test_points : np.ndarray
-            Array of test points for the likelihood evaluation.
-        uncertainty_kwargs : dict
-            Keyword arguments for the uncertainty model.
-        marginal_kwargs : dict
-            Keyword arguments for the marginal likelihood approximation.
         """
-
-        self.models = SurrogateCollection.from_ratiolist(**data,
-                                                         ratios=gene_pool)
-        self.logger.debug(f'Setting test points: {test_point}')
-        self.marginals = MarginalsFactory().get_marginals(**marginal_kwargs)
-        self.marginals.create_samples()
-        self.uncertainty_kwargs = uncertainty_kwargs
+        super().__init__(*args, **kwargs)
         self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
             self.models, self.marginals.samples)
         self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
-            self.models, test_point)
-        if len(test_point.shape) == 2:
-            self.num_test_points = test_point.shape[0]
-        elif len(test_point.shape) == 1:
-            self.num_test_points = 1
-        else:
-            raise ValueError(f'Invalid test point shape: {test_point.shape}')
-        self.test_point = test_point
-        self.score_type = score_type
-        self.metric_type = metric_type
-        self.num_proc = num_proc
-        self.nan_loc_counter = defaultdict(int)
+            self.models, self.test_point)
 
     def __call__(self, gene):
         """Evaluate the fitness function."""
@@ -201,6 +181,26 @@ class FitnessLookup(Fitness):
                 self.update_nan_loc_counter(nan_loc)
             return val
         return metric()
+
+
+class MultiModelFitness:
+    """Fitness function combining multiple fitness functions."""
+
+    def __init__(self, data, lookup=True, **kwargs):
+        if lookup is True:
+            self.fitness_functions = [
+                FitnessLookup(data=d, **kwargs) for d in data
+            ]
+        else:
+            self.fitness_functions = [Fitness(data=d, **kwargs) for d in data]
+
+    def __call__(self, gene):
+        """Call each fitness function and return mean of values.
+        
+        If the fitness functions return arrays, only the first dimension,
+        i.e., the number of models, is averaged here.
+        """
+        return np.mean([f(gene) for f in self.fitness_functions], axis=0)
 
 
 def split_into_chunks(lst, n):
@@ -473,7 +473,8 @@ def natural_selection(fitness_kws,
                       evolution_kws,
                       max_iter,
                       log_kwargs=None,
-                      lookup=False):
+                      lookup=False,
+                      multi_model=False):
     """Apply genetic selection"""
     logging.getLogger().debug(f'Log kwargs in natural selection: {log_kwargs}')
     if log_kwargs:
@@ -487,7 +488,12 @@ def natural_selection(fitness_kws,
         Evolution.config_logger(**log_kwargs)
         MutationFactory.config_logger(**log_kwargs)
         Fitness.config_logger(**log_kwargs)
-    if lookup:
+    if multi_model:
+        assert isinstance(
+            fitness_kws["data"], (list, tuple)
+        ), "Multi model fitness function only works with multiple models."
+        fitness_func = MultiModelFitness(**fitness_kws, lookup=lookup)
+    elif lookup:
         fitness_func = FitnessLookup(**fitness_kws)
     else:
         fitness_func = Fitness(**fitness_kws)
@@ -514,7 +520,8 @@ class GalapagosIslands:
                  max_iter=20,
                  rng_seed=12345,
                  use_lookup=False,
-                 use_combined=False):
+                 use_combined=False,
+                 use_multi_model=False):
         """Define the test space and set the metric."""
         test_point_dispatcher = {
             np.ndarray: self.set_test_points,
@@ -537,6 +544,7 @@ class GalapagosIslands:
         self.max_iter = max_iter
         self.use_lookup = use_lookup
         self.use_combined = use_combined
+        self.use_multi_model = use_multi_model
 
     def set_test_points(self, tp):
         """Set the test point array."""
@@ -602,7 +610,8 @@ class GalapagosIslands:
         best, fitness = natural_selection(fitness_kws=fit_kws,
                                           evolution_kws=evo_kws,
                                           max_iter=self.max_iter,
-                                          lookup=self.use_lookup)
+                                          lookup=self.use_lookup,
+                                          multi_model=self.use_multi_model)
         return best, fitness
 
     def _scan(self):
@@ -630,7 +639,8 @@ class GalapagosIslands:
             best, fitness = natural_selection(fitness_kws=fit_kws,
                                               evolution_kws=evo_kws,
                                               max_iter=self.max_iter,
-                                              lookup=self.use_lookup)
+                                              lookup=self.use_lookup,
+                                              multi_model=self.use_multi_model)
             best_genes.append(best)
             fitness_evolution.append(fitness)
         return best_genes, fitness_evolution
