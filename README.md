@@ -19,6 +19,8 @@ The _brute-force_ algorithm starts with a list of candidate ratios and then trys
 E.g. it repeats the above steps for all possible pairs (or tripletts or quadrupletts or ...) of isotopic ratios that can be created with the candidate ratios.
 Then, the best set (pair, triplet or whatever) is selected for each test point.
 Optionally, the second (and third or fourth ...) sets at each test point can be included as well.
+The _brute-force_ algorithm was based on the original implementation in [Figueroa's work](https://github.com/FigueroaAC/nuclide-ratios-selector/blob/main/isotope_ratio_selection.py), from which I refactored
+the code and added new features to the algorithm.
 
 The _genetic-evolution_ algorithm starts with a random subset of ratio candidates and iteratively changes the ratios according to certain rules (called _mutations_).
 This process continues for a specific number of iterations and in each iteration the best performing (according to the fitness function) ratio sets are kept and the rest discarded or modified via a mutation.
