@@ -195,8 +195,12 @@ class MultiModelFitness:
             self.fitness_functions = [Fitness(data=d, **kwargs) for d in data]
 
     def __call__(self, gene):
-        """Call each fitness function and return mean of values."""
-        return np.mean([f(gene) for f in self.fitness_functions])
+        """Call each fitness function and return mean of values.
+        
+        If the fitness functions return arrays, only the first dimension,
+        i.e., the number of models, is averaged here.
+        """
+        return np.mean([f(gene) for f in self.fitness_functions], axis=0)
 
 
 def split_into_chunks(lst, n):
