@@ -1,8 +1,6 @@
 #! /usr/bin/env python3
 """Filter nuclides and ratios based on simulation data."""
 
-import importlib.resources as pkg_resources
-import json
 import logging
 import re
 from itertools import combinations, groupby
@@ -13,10 +11,6 @@ import radioactivedecay as rd
 
 NUCLIDE_REGEX = re.compile(r'([A-Za-z]+)(-)?(\d+)_?(\*|m\d?|n)?')
 NOBLE_GASES = ['He', 'Ne', 'Ar', 'Kr', 'Xe', 'Rn']
-
-with pkg_resources.path(__package__, 'atomic_numbers.json') as p:
-    with open(p, 'r') as f:
-        ATOMIC_NUMBERS = json.load(f)
 
 
 def isotope_regex(element):
