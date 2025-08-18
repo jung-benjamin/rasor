@@ -15,6 +15,7 @@ from .marginals import MarginalsFactory
 from .metrics import SingleMetric
 from .sampling import SamplerFactory
 from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
+from .test_points import get_test_point_multi_set
 
 
 class SolubilityMatrix:
@@ -79,6 +80,7 @@ def evaluate_solubility_matrix(ratios,
             test_point_mu=test_point_lookup,
             test_point=test_points,
             **metric_params["Likelihood"]['uncertainty'])
+        metric_params["Metric"].pop("limits", None)
         metric = SingleMetric(likelihood=likelihood,
                               marginals=marginals,
                               **metric_params['Metric'])
@@ -119,8 +121,10 @@ class Minotaur:
             print(f'Using lookup tables...')
             m_fac = MarginalsFactory()
             m_dict = self.metric_params['Marginals'].copy()
+            # The .get on 'Problem' avoids errors here, but could lead to
+            # unexpected behavior elsewhere.
             m_dict['limits'] = np.array(self.metric_params['Metric'].get(
-                'limits', self.metric_params['Problem']['limits']))
+                'limits', self.metric_params['Problem'].get('limits')))
             self.marginals = m_fac.get_marginals(**m_dict)
             self.marginals.create_samples()
             self.models = SurrogateCollection.from_ratiolist(
@@ -207,12 +211,18 @@ class MultiMinotaur:
 
     def __init__(self, **kwargs):
         surrogates = kwargs["metric_params"]["Likelihood"].pop("surrogates")
+        sampling_limits = kwargs["metric_params"]["Metric"].pop("limits", None)
+        if sampling_limits is None:
+            # Should throw an error if limits are not provided
+            sampling_limits = kwargs["metric_params"]["Problem"].pop("limits")
+        test_points = get_test_point_multi_set(kwargs.pop("test_points"))
         assert isinstance(surrogates, (list, tuple))
         self.minotaurs = []
-        for sur in surrogates:
+        for sur, tp, lim in zip(surrogates, test_points, sampling_limits):
             kwarg_cp = deepcopy(kwargs)
             kwarg_cp["metric_params"]["Likelihood"]["surrogates"] = sur
-            self.minotaurs.append(Minotaur(**kwarg_cp))
+            kwarg_cp["metric_params"]["Metric"]["limits"] = lim
+            self.minotaurs.append(Minotaur(test_points=tp, **kwarg_cp))
 
     def fight(self, num_proc=1):
         """Calculate solubility matrix of each minotaur."""
