@@ -6,6 +6,7 @@ import logging
 import multiprocessing as mp
 from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 from functools import reduce
 from itertools import chain
 from multiprocessing import Pool
@@ -186,13 +187,40 @@ class FitnessLookup(Fitness):
 class MultiModelFitness:
     """Fitness function combining multiple fitness functions."""
 
-    def __init__(self, data, lookup=True, **kwargs):
+    def __init__(self,
+                 data,
+                 test_point,
+                 marginal_kwargs,
+                 lookup=True,
+                 **kwargs):
+        """Initialize the multi-model fitness function."""
+        assert isinstance(data, (list, tuple)), \
+            "Multi-model fitness function only works with multiple models."
+        assert test_point.ndim == 3, \
+            "Test point must be a 3D array for multi-model fitness."
+        assert np.array(marginal_kwargs['limits']).ndim == 3, \
+            "Marginal limits must be a 3D array for multi-model fitness."
+        marginal_kwargs_cp = deepcopy(marginal_kwargs)
+        marginal_limits = marginal_kwargs_cp.pop('limits')
+        marginal_kwarg_list = []
+        for limits in marginal_limits:
+            mgk = marginal_kwargs_cp.copy()
+            mgk['limits'] = limits
+            marginal_kwarg_list.append(mgk)
+
         if lookup is True:
             self.fitness_functions = [
-                FitnessLookup(data=d, **kwargs) for d in data
+                FitnessLookup(data=d,
+                              test_point=t,
+                              marginal_kwargs=m,
+                              **kwargs)
+                for (d, t, m) in zip(data, test_point, marginal_kwarg_list)
             ]
         else:
-            self.fitness_functions = [Fitness(data=d, **kwargs) for d in data]
+            self.fitness_functions = [
+                Fitness(data=d, test_point=t, marginal_kwargs=m, **kwargs)
+                for (d, t, m) in zip(data, test_point, marginal_kwarg_list)
+            ]
 
     def __call__(self, gene):
         """Call each fitness function and return mean of values.
@@ -552,8 +580,23 @@ class GalapagosIslands:
 
     def sample_test_points(self, kwarg_dict):
         """Create a sampler and create the test point array."""
-        self.sampler = SamplerFactory().get_sampler(**kwarg_dict)
-        self.set_test_points(self.sampler())
+        match np.array(kwarg_dict['limits']).ndim:
+            case 3:
+                kwarg_dict_cp = deepcopy(kwarg_dict)
+                test_points = []
+                for limits in kwarg_dict_cp.pop('limits'):
+                    sampler = SamplerFactory().get_sampler(limits=limits,
+                                                           **kwarg_dict_cp)
+                    test_points.append(sampler())
+                test_points = np.array(test_points)
+            case 2:
+                sampler = SamplerFactory().get_sampler(**kwarg_dict)
+                test_points = sampler()
+            case _:
+                raise ValueError(
+                    f'Invalid limits shape: {np.array(kwarg_dict["limits"]).shape}'
+                )
+        self.set_test_points(test_points)
 
     @property
     def logger(self):
