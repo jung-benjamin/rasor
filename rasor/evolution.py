@@ -22,6 +22,7 @@ from .metrics import MultiMetric, SingleMetric
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
 from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
+from .test_points import get_test_point_matrix, get_test_point_multi_set
 
 
 class Fitness:
@@ -551,12 +552,6 @@ class GalapagosIslands:
                  use_combined=False,
                  use_multi_model=False):
         """Define the test space and set the metric."""
-        test_point_dispatcher = {
-            np.ndarray: self.set_test_points,
-            dict: self.sample_test_points
-        }
-        t = type(test_points)
-        test_point_dispatcher[t](test_points)
         self.gene_pool = gene_pool
         self.mutations = mutations
         self.init_size = init_size
@@ -573,30 +568,10 @@ class GalapagosIslands:
         self.use_lookup = use_lookup
         self.use_combined = use_combined
         self.use_multi_model = use_multi_model
-
-    def set_test_points(self, tp):
-        """Set the test point array."""
-        self.test_points = tp
-
-    def sample_test_points(self, kwarg_dict):
-        """Create a sampler and create the test point array."""
-        match np.array(kwarg_dict['limits']).ndim:
-            case 3:
-                kwarg_dict_cp = deepcopy(kwarg_dict)
-                test_points = []
-                for limits in kwarg_dict_cp.pop('limits'):
-                    sampler = SamplerFactory().get_sampler(limits=limits,
-                                                           **kwarg_dict_cp)
-                    test_points.append(sampler())
-                test_points = np.array(test_points)
-            case 2:
-                sampler = SamplerFactory().get_sampler(**kwarg_dict)
-                test_points = sampler()
-            case _:
-                raise ValueError(
-                    f'Invalid limits shape: {np.array(kwarg_dict["limits"]).shape}'
-                )
-        self.set_test_points(test_points)
+        if use_multi_model:
+            self.test_points = get_test_point_multi_set(test_points)
+        else:
+            self.test_points = get_test_point_matrix(test_points)
 
     @property
     def logger(self):
