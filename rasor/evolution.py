@@ -21,7 +21,8 @@ from .marginals import MarginalsFactory
 from .metrics import MultiMetric, SingleMetric
 from .mutations import MutationFactory
 from .sampling import SamplerFactory
-from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
+from .surrogates import (FrozenSurrogateLookUp, GPSurrogateCollection,
+                         SurrogateCollection)
 from .test_points import get_test_point_matrix, get_test_point_multi_set
 
 
@@ -48,7 +49,7 @@ class Fitness:
             List of isotopic ratios.
         data : dict
             Dictionary with x and y data for the interpolation-based
-            surrogate models.
+            surrogate models, or model_file for GP-based models.
         test_points : np.ndarray
             Array of test points for the likelihood evaluation.
         uncertainty_kwargs : dict
@@ -56,8 +57,15 @@ class Fitness:
         marginal_kwargs : dict
             Keyword arguments for the marginal likelihood approximation.
         """
-        self.models = SurrogateCollection.from_ratiolist(**data,
-                                                         ratios=gene_pool)
+        # Doesn't catch all cases that could go wrong, but good enough
+        if "x" in data and "y" in data:
+            self.models = SurrogateCollection.from_ratiolist(**data,
+                                                             ratios=gene_pool)
+        elif "model_file" in data:
+            self.models = GPSurrogateCollection.from_ratiolist(
+                **data, ratios=gene_pool)
+        else:
+            raise ValueError("Data must contain 'x' and 'y' or 'model_file'.")
         self.test_point = test_point
         self.logger.debug(f'Setting test point: {test_point}')
         self.uncertainty_kwargs = uncertainty_kwargs

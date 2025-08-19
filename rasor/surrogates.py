@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from gaussianprocesses.models import ModelCollection
 from scipy.interpolate import RegularGridInterpolator, interp2d
 
 
@@ -188,6 +189,19 @@ class SurrogateCollection(dict):
     def get_subset(self, keys):
         """Return a subset of the collection."""
         return SurrogateCollection({k: self[k] for k in keys})
+
+
+class GPSurrogateCollection(SurrogateCollection, ModelCollection):
+    """Collection of Gaussian Process Surrogates."""
+
+    @classmethod
+    def from_ratiolist(cls, model_file, ratios, base=None):
+        """Create a collection of Gaussian Process Surrogates."""
+        if base is None:
+            base = Path(model_file).parent
+        obj = cls.from_json(fp=model_file, base=base)
+        ratio_models = obj.get_quotient_models(ratios)
+        return ratio_models
 
 
 class FrozenSurrogateLookUp(dict):

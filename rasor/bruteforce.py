@@ -14,7 +14,8 @@ from .likelihood import GaussianLikelihoodLookUp
 from .marginals import MarginalsFactory
 from .metrics import SingleMetric
 from .sampling import SamplerFactory
-from .surrogates import FrozenSurrogateLookUp, SurrogateCollection
+from .surrogates import (FrozenSurrogateLookUp, GPSurrogateCollection,
+                         SurrogateCollection)
 from .test_points import get_test_point_multi_set
 
 
@@ -127,9 +128,19 @@ class Minotaur:
                 'limits', self.metric_params['Problem'].get('limits')))
             self.marginals = m_fac.get_marginals(**m_dict)
             self.marginals.create_samples()
-            self.models = SurrogateCollection.from_ratiolist(
-                **self.metric_params["Likelihood"]["surrogates"],
-                ratios=self.ratios)
+            if (("x" in self.metric_params["Likelihood"]["surrogates"]) and
+                ("y" in self.metric_params["Likelihood"]["surrogates"])):
+                self.models = SurrogateCollection.from_ratiolist(
+                    **self.metric_params["Likelihood"]["surrogates"],
+                    ratios=self.ratios)
+            elif "model_file" in self.metric_params["Likelihood"][
+                    "surrogates"]:
+                self.models = GPSurrogateCollection.from_ratiolist(
+                    **self.metric_params["Likelihood"]["surrogates"],
+                    ratios=self.ratios)
+            else:
+                raise ValueError(
+                    "Surrogates must contain 'x' and 'y' or 'model_file'.")
             self.surrogate_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
                 self.models, self.marginals.samples)
             self.test_point_lookup = FrozenSurrogateLookUp.from_surrogate_collection(
