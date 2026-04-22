@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/760055084.svg)](https://doi.org/10.5281/zenodo.19696048)
+
 # RAtio SelectOR
 
 RASOR is a package comprising algorithms for selecting suitable (in the best case _optimal_) isotopic ratios for Bayesian inference with nuclear reprocessing waste.
