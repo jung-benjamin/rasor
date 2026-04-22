@@ -138,8 +138,11 @@ To run _genetic-evolution_, replace "brute_force" with the following:
 }
 ```
 
-In any case, the algorithms require input and output data for a regular grid interpolator.
-
 Regarding the metric, the marginal distributions can be approximated either via a grid-based or a Sobol-sequence-based algorithm.
 The Sobol sequence-based algorithm scales better than the grid-based algorithm, but is usually slower in lower dimensions (2 or lower).
 The reason is that the Sobol sequence needs about 2^m evaluations, where m should be larger than 16.
+
+## Surrogate modelling
+
+The algorithm requires models to predict the nuclide ratios given the samples input parameter values.
+These can be grid-based interpolators or Gaussian processes (using the [gp-surfer](https://github.com/jung-benjamin/gp-surfer) package).
